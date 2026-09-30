@@ -142,7 +142,7 @@ A deployment administrator has no access to a workspace they aren't a member of.
 
 | Resource | Endpoints |
 | --- | --- |
-| `workspaces` | `GET /`, `POST /`, `GET/PUT/DELETE /:workspaceUid`, `GET/POST /:workspaceUid/members`, `PUT/DELETE /:workspaceUid/members/:userUid`, `GET/POST /:workspaceUid/senders`, `PUT/DELETE /:workspaceUid/senders/:senderUid` |
+| `workspaces` | `GET /`, `POST /`, `GET/PUT/DELETE /:workspaceUid`, `GET/POST /:workspaceUid/members`, `PUT/DELETE /:workspaceUid/members/:userUid`, `GET/POST /:workspaceUid/senders`, `PUT/DELETE /:workspaceUid/senders/:senderUid`, `POST /:workspaceUid/sendable-mailboxes` (`{ mailboxUids }`: which of them the caller can send from) |
 | `contacts`, `companies` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `POST /:workspaceUid/bulk`, `POST /:workspaceUid/export`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
 | `properties`, `notes`, `tasks` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
 | `timeline` | `GET /:workspaceUid/:subjectType/:subjectUid` |

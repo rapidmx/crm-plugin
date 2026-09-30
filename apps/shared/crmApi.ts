@@ -209,6 +209,16 @@ export const updateSender = (uid: string, senderUid: string, input: { fromName?:
     apiFetch(`/mail/crm/workspaces/${enc(uid)}/senders/${enc(senderUid)}`, json("PUT", input));
 export const addSender = (uid: string, input: { fromAddress: string; fromName?: string; replyToAddress?: string; logEmail?: boolean }): Promise<WorkspaceSender> =>
     apiFetch(`/mail/crm/workspaces/${enc(uid)}/senders`, json("POST", input));
+/** A mailbox the caller may add as a sender. */
+export interface SendableMailbox {
+    uid: string;
+    address: string;
+    displayName: string;
+}
+
+/** Which of `mailboxUids` (the caller's mailboxes) the caller can send from, for the "Send as" picker. */
+export const sendableMailboxes = (uid: string, mailboxUids: string[]): Promise<SendableMailbox[]> =>
+    apiFetch(`/mail/crm/workspaces/${enc(uid)}/sendable-mailboxes`, json("POST", { mailboxUids }));
 export const removeSender = (uid: string, senderUid: string): Promise<void> => apiFetch(`/mail/crm/workspaces/${enc(uid)}/senders/${enc(senderUid)}`, json("DELETE"));
 
 // Contacts and companies

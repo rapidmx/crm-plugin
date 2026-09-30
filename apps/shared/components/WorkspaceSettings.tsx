@@ -2,14 +2,20 @@
 // Copyright (C) 2026 Jean-Philippe Steinmetz
 // SPDX-License-Identifier: MPL-2.0
 ///////////////////////////////////////////////////////////////////////////////
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import Alert from "@rapidmx/web-client/lib/components/feedback/Alert.js";
 import Button from "@rapidmx/web-client/lib/components/buttons/Button.js";
 import FormField from "@rapidmx/web-client/lib/components/forms/FormField.js";
+import TimeZonePicker from "@rapidmx/web-client/lib/components/pickers/TimeZonePicker.js";
+import { timeZoneOptions } from "@rapidmx/web-client/lib/util/timeZone.js";
+import { listMailboxes } from "@rapidmx/web-client/lib/mail/mailApi.js";
+import { RecipientSuggestion, searchDirectory } from "@rapidmx/web-client/lib/mail/directoryApi.js";
+import RecipientInput from "@rapidmx/web-client/shared/components/mail/compose/RecipientInput.js";
 import {
     CrmObjectType,
     PropertyDefinition,
     PropertyType,
+    SendableMailbox,
     WorkspaceMember,
     WorkspaceRole,
     WorkspaceSender,
@@ -28,6 +34,7 @@ import {
     listSenders,
     removeMember,
     removeSender,
+    sendableMailboxes,
     updateMember,
     updateWorkspace,
     updateSender,
@@ -93,13 +100,13 @@ function Details() {
         }
     }
 
-    const fields: [keyof typeof values, string][] = [
+    const fields: [Exclude<keyof typeof values, "timezone">, string][] = [
         ["name", "Name"],
         ["description", "Description"],
-        ["timezone", "Time zone"],
         ["postalAddress", "Postal address (shown in marketing email footers)"],
         ["website", "Website"],
     ];
+    const zones: string[] = useMemo(() => timeZoneOptions(workspace.timezone), [workspace.timezone]);
     return (
         <form onSubmit={save} className="flex flex-col gap-3" aria-label="Workspace details">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Workspace</h2>
@@ -116,6 +123,13 @@ function Details() {
                     />
                 </FormField>
             ))}
+            <FormField label="Time zone" htmlFor="workspace-timezone">
+                {canManage ? (
+                    <TimeZonePicker id="workspace-timezone" value={values.timezone} zones={zones} onChange={(timezone) => setValues((current) => ({ ...current, timezone }))} />
+                ) : (
+                    <input id="workspace-timezone" className={INPUT_CLASS} value={values.timezone} disabled />
+                )}
+            </FormField>
             {canManage && (
                 <Button type="submit" className="!w-auto self-start">
                     Save
@@ -125,12 +139,25 @@ function Details() {
     );
 }
 
+/** The address of an entry of the people field: `Name <address>` or a bare address. */
+export function chipAddress(chip: string): string {
+    const match: RegExpExecArray | null = /<([^<>]+)>\s*$/.exec(chip);
+    return (match ? match[1] : chip).trim().toLowerCase();
+}
+
+/** Suggests only people with an account on this server - the only ones who can be members. */
+export async function suggestPeople(query: string, options: { limit?: number; signal?: AbortSignal }): Promise<RecipientSuggestion[]> {
+    return (await searchDirectory(query, options)).filter((suggestion) => suggestion.kind === "user");
+}
+
 function Members() {
     const { workspace, canManage } = useCrm();
     const [members, setMembers] = useState<WorkspaceMember[]>([]);
-    const [address, setAddress] = useState("");
+    const [text, setText] = useState("");
+    const [people, setPeople] = useState<{ chips: string[]; pending: string }>({ chips: [], pending: "" });
     const [role, setRole] = useState<WorkspaceRole>("editor");
     const [error, setError] = useState<string | null>(null);
+    const [adding, setAdding] = useState(false);
 
     async function load(): Promise<void> {
         setMembers(await listMembers(workspace.uid));
@@ -150,55 +177,90 @@ function Members() {
         }
     }
 
+    /** Adds everyone in the field; those that fail stay in it, with why. */
+    async function add(event: FormEvent): Promise<void> {
+        event.preventDefault();
+        const entries: string[] = [...people.chips, ...(people.pending.trim() ? [people.pending.trim()] : [])];
+        setAdding(true);
+        const failed: string[] = [];
+        const reasons: string[] = [];
+        for (const entry of entries) {
+            try {
+                await addMember(workspace.uid, { address: chipAddress(entry), role });
+            } catch (err) {
+                failed.push(entry);
+                reasons.push(`${chipAddress(entry)}: ${errorMessage(err, "could not be added.")}`);
+            }
+        }
+        setText(failed.join(", "));
+        setPeople({ chips: failed, pending: "" });
+        setAdding(false);
+        try {
+            await load();
+            setError(reasons.length > 0 ? reasons.join(" ") : null);
+        } catch (err) {
+            setError([...reasons, errorMessage(err, "Could not load the members.")].join(" "));
+        }
+    }
+
+    const count: number = people.chips.length + (people.pending.trim() ? 1 : 0);
     return (
         <section aria-label="Members" className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Members</h2>
             {error && <Alert>{error}</Alert>}
             <ul className="flex flex-col divide-y divide-border border-y border-border">
-                {members.map((member) => (
-                    <li key={member.userUid} className="flex items-center gap-3 py-2 text-sm">
-                        <span className="flex-1">{member.displayName || member.address || member.userUid}</span>
-                        {canManage ? (
-                            <select
-                                aria-label={`Role of ${member.displayName || member.address || member.userUid}`}
-                                className={`${INPUT_CLASS} !w-32`}
-                                value={member.role}
-                                onChange={(event) => void act(() => updateMember(workspace.uid, member.userUid, event.target.value as WorkspaceRole), "Could not change the role.")}
-                            >
-                                {ROLES.map((entry) => (
-                                    <option key={entry.value} value={entry.value}>
-                                        {entry.label}
-                                    </option>
-                                ))}
-                            </select>
-                        ) : (
-                            <span className="text-text-muted">{member.role}</span>
-                        )}
-                        {canManage && (
-                            <button
-                                type="button"
-                                className="text-xs text-text-muted hover:text-danger"
-                                onClick={() => void act(() => removeMember(workspace.uid, member.userUid), "Could not remove the member.")}
-                            >
-                                Remove
-                            </button>
-                        )}
-                    </li>
-                ))}
+                {members.map((member) => {
+                    const name: string = member.displayName || member.address || member.userUid;
+                    return (
+                        <li key={member.userUid} className="flex items-center gap-3 py-2 text-sm">
+                            <span className="flex-1 min-w-0">
+                                <span className="block truncate">{name}</span>
+                                {member.displayName && member.address && <span className="block truncate text-xs text-text-muted">{member.address}</span>}
+                            </span>
+                            {canManage ? (
+                                <select
+                                    aria-label={`Role of ${name}`}
+                                    className={`${INPUT_CLASS} !w-32`}
+                                    value={member.role}
+                                    onChange={(event) => void act(() => updateMember(workspace.uid, member.userUid, event.target.value as WorkspaceRole), "Could not change the role.")}
+                                >
+                                    {ROLES.map((entry) => (
+                                        <option key={entry.value} value={entry.value}>
+                                            {entry.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="text-text-muted">{member.role}</span>
+                            )}
+                            {canManage && (
+                                <button
+                                    type="button"
+                                    className="text-xs text-text-muted hover:text-danger"
+                                    onClick={() => void act(() => removeMember(workspace.uid, member.userUid), "Could not remove the member.")}
+                                >
+                                    Remove
+                                </button>
+                            )}
+                        </li>
+                    );
+                })}
             </ul>
             {canManage && (
-                <form
-                    className="flex flex-wrap gap-2"
-                    aria-label="Add member"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        void act(async () => {
-                            await addMember(workspace.uid, { address, role });
-                            setAddress("");
-                        }, "Could not add the member.");
-                    }}
-                >
-                    <input aria-label="Member address" placeholder="colleague@example.com" className={`${INPUT_CLASS} !w-72`} value={address} onChange={(event) => setAddress(event.target.value)} />
+                <form className="flex flex-wrap items-start gap-2" aria-label="Add members" onSubmit={(event) => void add(event)}>
+                    <div className="flex-1 min-w-[18rem]">
+                        <RecipientInput
+                            id="crm-new-members"
+                            label="People"
+                            ariaLabel="People to add"
+                            placeholder="Search people by name or address"
+                            value={text}
+                            onChange={setText}
+                            onEdit={(chips, pending) => setPeople({ chips, pending })}
+                            fetchSuggestions={suggestPeople}
+                            className={INPUT_CLASS}
+                        />
+                    </div>
                     <select aria-label="New member role" className={`${INPUT_CLASS} !w-32`} value={role} onChange={(event) => setRole(event.target.value as WorkspaceRole)}>
                         {ROLES.map((entry) => (
                             <option key={entry.value} value={entry.value}>
@@ -206,8 +268,8 @@ function Members() {
                             </option>
                         ))}
                     </select>
-                    <Button type="submit" variant="secondary" disabled={address.trim() === ""} className="!w-auto">
-                        Add member
+                    <Button type="submit" variant="secondary" loading={adding} disabled={adding || count === 0} className="!w-auto">
+                        {count > 1 ? `Add ${count} members` : "Add member"}
                     </Button>
                 </form>
             )}
@@ -218,7 +280,8 @@ function Members() {
 function Senders() {
     const { workspace, canManage } = useCrm();
     const [senders, setSenders] = useState<WorkspaceSender[]>([]);
-    const [fromAddress, setFromAddress] = useState("");
+    const [mailboxes, setMailboxes] = useState<SendableMailbox[] | null>(null);
+    const [mailboxUid, setMailboxUid] = useState("");
     const [fromName, setFromName] = useState("");
     const [error, setError] = useState<string | null>(null);
 
@@ -230,11 +293,24 @@ function Senders() {
         load().catch((err) => setError(errorMessage(err, "Could not load the senders.")));
     }, [workspace.uid]);
 
+    useEffect(() => {
+        if (!canManage) {
+            return;
+        }
+        (async () => {
+            const own = await listMailboxes({ limit: 200 });
+            setMailboxes(own.length > 0 ? await sendableMailboxes(workspace.uid, own.map((mailbox) => mailbox.uid)) : []);
+        })().catch(() => setMailboxes([]));
+    }, [workspace.uid, canManage]);
+
+    const choices: SendableMailbox[] = (mailboxes ?? []).filter((mailbox) => !senders.some((sender) => sender.fromAddress === mailbox.address));
+    const chosen: SendableMailbox | undefined = choices.find((mailbox) => mailbox.uid === mailboxUid);
+
     async function add(event: FormEvent): Promise<void> {
         event.preventDefault();
         try {
-            await addSender(workspace.uid, { fromAddress, ...(fromName.trim() ? { fromName } : {}) });
-            setFromAddress("");
+            await addSender(workspace.uid, { fromAddress: chosen!.address, ...(fromName.trim() ? { fromName: fromName.trim() } : {}) });
+            setMailboxUid("");
             setFromName("");
             setError(null);
             await load();
@@ -246,7 +322,7 @@ function Senders() {
     return (
         <section aria-label="Senders" className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Send as</h2>
-            <p className="text-sm text-text-muted">Addresses of mailboxes you can send from. Replies to mail sent from the CRM arrive in these mailboxes.</p>
+            <p className="text-sm text-text-muted">Mailboxes the CRM sends from. Replies to mail sent from the CRM arrive in these mailboxes.</p>
             {error && <Alert>{error}</Alert>}
             <ul className="flex flex-col gap-1">
                 {senders.map((sender) => (
@@ -285,11 +361,29 @@ function Senders() {
                     </li>
                 ))}
             </ul>
-            {canManage && (
-                <form className="flex flex-wrap gap-2" aria-label="Add sender" onSubmit={add}>
-                    <input aria-label="Sender address" placeholder="sales@example.com" className={`${INPUT_CLASS} !w-64`} value={fromAddress} onChange={(event) => setFromAddress(event.target.value)} />
+            {canManage && mailboxes !== null && mailboxes.length === 0 && (
+                <p className="text-sm text-text-muted">You have no mailbox you can send from. Its owner can add it, or give you send access to it.</p>
+            )}
+            {canManage && choices.length > 0 && (
+                <form className="flex flex-wrap gap-2" aria-label="Add sender" onSubmit={(event) => void add(event)}>
+                    <select
+                        aria-label="Mailbox"
+                        className={`${INPUT_CLASS} !w-72`}
+                        value={mailboxUid}
+                        onChange={(event) => {
+                            setMailboxUid(event.target.value);
+                            setFromName(choices.find((mailbox) => mailbox.uid === event.target.value)?.displayName ?? "");
+                        }}
+                    >
+                        <option value="">Choose a mailbox…</option>
+                        {choices.map((mailbox) => (
+                            <option key={mailbox.uid} value={mailbox.uid}>
+                                {mailbox.displayName ? `${mailbox.displayName} <${mailbox.address}>` : mailbox.address}
+                            </option>
+                        ))}
+                    </select>
                     <input aria-label="Sender name" placeholder="Name shown to recipients" className={`${INPUT_CLASS} !w-56`} value={fromName} onChange={(event) => setFromName(event.target.value)} />
-                    <Button type="submit" variant="secondary" disabled={fromAddress.trim() === ""} className="!w-auto">
+                    <Button type="submit" variant="secondary" disabled={!chosen} className="!w-auto">
                         Add sender
                     </Button>
                 </form>

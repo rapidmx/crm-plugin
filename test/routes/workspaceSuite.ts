@@ -133,6 +133,42 @@ export function workspaceSuite(ctx: CrmTestContext): void {
     });
 
     describe("workspace senders", () => {
+        it("names members after their own mailbox: the creator, those added by uid, and those added before", async () => {
+            await ctx.createMailbox(ctx.users.owner.uid, "olive@acme.example");
+            await ctx.createMailbox(ctx.users.owner.uid, "olive-2@acme.example");
+            await ctx.createMailbox(ctx.users.editor.uid, "eddie@acme.example");
+            const workspaceUid: string = (await call(ctx, "post", "/workspaces", ctx.users.owner, { name: "Named" })).body.uid;
+            await call(ctx, "post", `/workspaces/${workspaceUid}/members`, ctx.users.owner, { userUid: ctx.users.editor.uid, role: "editor" });
+            await call(ctx, "post", `/workspaces/${workspaceUid}/members`, ctx.users.owner, { userUid: ctx.users.viewer.uid, role: "viewer" });
+            // A member stored without a name (as members were before) is described when listed.
+            const repo = await ctx.repo("workspaceMember");
+            const row = (await repo.find({ workspaceUid, userUid: ctx.users.editor.uid }, { ignoreACL: true, limit: 1 }))[0];
+            await repo.update({ uid: row.uid, version: row.version, address: null, displayName: null }, row, { ignoreACL: true });
+
+            const members = (await call(ctx, "get", `/workspaces/${workspaceUid}/members`, ctx.users.viewer)).body;
+            expect(members.map((member: any) => [member.role, member.address ?? null, member.displayName ?? null])).toEqual([
+                ["owner", "olive@acme.example", "Mailbox of olive@acme.example"],
+                ["editor", "eddie@acme.example", "Mailbox of eddie@acme.example"],
+                ["viewer", null, null],
+            ]);
+            expect((await repo.find({ workspaceUid, userUid: ctx.users.editor.uid }, { ignoreACL: true, limit: 1 }))[0].address ?? null).toBeNull();
+        });
+
+        it("tells an admin which of their mailboxes they can send from", async () => {
+            const workspaceUid: string = await setUpWorkspace(ctx);
+            const path = `/workspaces/${workspaceUid}/sendable-mailboxes`;
+            await ctx.createMailbox(ctx.users.owner.uid, "sales@acme.example");
+            await ctx.createMailbox(ctx.users.stranger.uid, "ceo@acme.example");
+            await ctx.createMailbox(ctx.users.stranger.uid, "shared@acme.example", [{ userOrRoleId: ctx.users.owner.uid, actions: ["READ"] }]);
+            const answer = await call(ctx, "post", path, ctx.users.owner, { mailboxUids: ["sales@acme.example", "sales@acme.example", "ceo@acme.example", "shared@acme.example", "gone"] });
+            expect(answer.body).toEqual([{ uid: "sales@acme.example", address: "sales@acme.example", displayName: "Mailbox of sales@acme.example" }]);
+            for (const body of [{}, { mailboxUids: "x" }, { mailboxUids: [5] }, { mailboxUids: [""] }, { mailboxUids: Array.from({ length: 201 }, (_value, index) => `m${index}`) }]) {
+                expect((await call(ctx, "post", path, ctx.users.owner, body)).status).toBe(400);
+            }
+            expect((await call(ctx, "post", path, ctx.users.editor, { mailboxUids: [] })).status).toBe(403);
+            expect((await call(ctx, "post", path, ctx.users.owner, { mailboxUids: [] })).body).toEqual([]);
+        });
+
         it("adds a sender for a mailbox the caller can send from, and refuses anyone else's", async () => {
             const workspaceUid: string = await setUpWorkspace(ctx);
             const path = `/workspaces/${workspaceUid}/senders`;

@@ -265,6 +265,7 @@ describe("crmApi", () => {
         await api.deleteDeal("w", "d");
         await api.dealForecast("w", "p");
         await api.updateSender("w", "s", { logEmail: true });
+        await api.sendableMailboxes("w", ["m1"]);
         expect(calls).toEqual([
             "GET /api/mail/crm/pipelines/w?limit=50",
             'POST /api/mail/crm/pipelines/w {"name":"P"}',
@@ -278,6 +279,7 @@ describe("crmApi", () => {
             "DELETE /api/mail/crm/deals/w/d",
             "GET /api/mail/crm/deals/w/forecast?pipelineUid=p&days=90",
             'PUT /api/mail/crm/workspaces/w/senders/s {"logEmail":true}',
+            'POST /api/mail/crm/workspaces/w/sendable-mailboxes {"mailboxUids":["m1"]}',
         ]);
     });
 

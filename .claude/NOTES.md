@@ -262,6 +262,13 @@ Keep entries terse — this is a reference, not a transcript.
   load in the CI container (`ERR_SWC_NATIVE_CACHE`: "cache root /github/home/.cache has a parent writable by another user"), which
   breaks vitest's config load. Don't loosen the pin without checking CI.
 
+- **Workspace settings use web-client's own controls.** Members are added with compose's `RecipientInput`, its suggestions narrowed
+  to `searchDirectory()` entries of kind `user`; each chip is `POST`ed as `{ address }` (resolved server-side to the mailbox
+  owner). Members are named after their first owned mailbox (`describeUser`): stored when added (creator, by uid) and filled in
+  when listed for rows stored without. "Send as" lists `listMailboxes()` filtered through `POST /workspaces/:ws/sendable-mailboxes`
+  (update access, checked server-side), prefilling the mailbox's display name. The time zone uses `TimeZonePicker` with
+  `timeZoneOptions()`. These web-client modules were added to its README's plugin UI surface (web-client 3ecb245).
+
 ## Session Log
 
 ### 2026-09-29 — Phase 1: the plugin created

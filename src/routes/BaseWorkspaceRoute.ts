@@ -57,6 +57,16 @@ const WORKSPACE_DATA: readonly CrmModelName[] = [
     "workspaceMember",
 ];
 
+/** How many mailboxes one "Send as" check may name. */
+export const MAX_SENDABLE_CHECK = 200;
+
+/** A mailbox the caller may add as a sender. */
+export interface SendableMailbox {
+    uid: string;
+    address: string;
+    displayName: string;
+}
+
 /** A workspace as its members see it: the record plus the caller's own role. */
 export interface WorkspaceView extends Workspace {
     role: WorkspaceRole;
@@ -125,7 +135,7 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
             acl: { uid: instance.uid, records: [memberRecord(userUid, WorkspaceRole.OWNER)] },
         });
         const memberClass: any = this.classes.workspaceMember;
-        await (await this.repo("workspaceMember")).create(new memberClass({ workspaceUid: workspace.uid, userUid, role: WorkspaceRole.OWNER }), {
+        await (await this.repo("workspaceMember")).create(new memberClass({ workspaceUid: workspace.uid, userUid, role: WorkspaceRole.OWNER, ...(await this.describeUser(userUid)) }), {
             ignoreACL: true,
         });
         return { ...this.plain(workspace), role: WorkspaceRole.OWNER };
@@ -170,7 +180,12 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
     @Get("/:workspaceUid/members")
     public async listMembers(@Param("workspaceUid") workspaceUid: string, @AuthUser user?: JWTUser): Promise<WorkspaceMember[]> {
         await this.requireAccess(user, workspaceUid, WorkspaceAction.READ);
-        return (await this.members(workspaceUid)).map((member) => this.plain(member));
+        const views: WorkspaceMember[] = [];
+        for (const member of await this.members(workspaceUid)) {
+            const view: WorkspaceMember = this.plain(member);
+            views.push(view.address ? view : { ...view, ...(await this.describeUser(member.userUid)) });
+        }
+        return views;
     }
 
     /**
@@ -296,6 +311,28 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
         return this.plain(sender);
     }
 
+    /**
+     * Which of `mailboxUids` (the caller's mailboxes, as the web client lists them) the caller may add as senders - those they can
+     * send from (update access) - with each one's address and name, for the "Send as" picker. Up to `MAX_SENDABLE_CHECK` at once.
+     */
+    @Post("/:workspaceUid/sendable-mailboxes")
+    public async sendableMailboxes(@Param("workspaceUid") workspaceUid: string, body: unknown, @AuthUser user?: JWTUser): Promise<SendableMailbox[]> {
+        await this.requireAccess(user, workspaceUid, WorkspaceAction.MANAGE);
+        const uids: unknown = requireObject(body).mailboxUids;
+        if (!Array.isArray(uids) || uids.length > MAX_SENDABLE_CHECK || uids.some((uid) => typeof uid !== "string" || uid.length === 0 || uid.length > 128)) {
+            throw badRequest(`'mailboxUids' must be a list of up to ${MAX_SENDABLE_CHECK} mailbox uids.`);
+        }
+        const repo = await this.repo<Mailbox>("mailbox");
+        const sendable: SendableMailbox[] = [];
+        for (const uid of new Set(uids as string[])) {
+            const mailbox: Mailbox | undefined = await repo.findOne(uid, { ignoreACL: true, skipCache: true });
+            if (mailbox && (await hasMailAccess(this.aclUtils, this.trustedRoles, user, mailbox.uid, ACLAction.UPDATE))) {
+                sendable.push({ uid: mailbox.uid, address: mailbox.primarySmtpAddress, displayName: mailbox.displayName ?? "" });
+            }
+        }
+        return sendable;
+    }
+
     @Put("/:workspaceUid/senders/:senderUid")
     public async updateSender(
         @Param("workspaceUid") workspaceUid: string,
@@ -385,7 +422,8 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
     /** Who a member request names: `userUid` as given, or `address` as the owner of the mailbox with that address. */
     private async resolvePerson(body: Record<string, unknown>): Promise<{ userUid: string; address?: string; displayName?: string }> {
         if (typeof body.userUid === "string" && body.userUid.trim().length > 0 && body.userUid.length <= 128) {
-            return { userUid: body.userUid.trim().toLowerCase() };
+            const userUid: string = body.userUid.trim().toLowerCase();
+            return { userUid, ...(await this.describeUser(userUid)) };
         }
         const address: string | null | undefined = readEmail(body, "address");
         if (!address) {
@@ -408,6 +446,20 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
             { ignoreACL: true, limit: 1, skipCache: true },
         );
         return matches[0];
+    }
+
+    /**
+     * A user's name and address, as their own mailbox (the first they own) has them - users are known to the mail server only by
+     * uid. Nothing for a user without a mailbox.
+     */
+    private async describeUser(userUid: string): Promise<{ address?: string; displayName?: string }> {
+        const owned: Mailbox | undefined = (
+            await (await this.repo<Mailbox>("mailbox")).find(
+                { ownerUserUid: ModelUtils.literal(userUid), sort: { dateCreated: "ASC" } },
+                { ignoreACL: true, limit: 1, skipCache: true },
+            )
+        )[0];
+        return owned ? { address: owned.primarySmtpAddress, ...(owned.displayName ? { displayName: owned.displayName } : {}) } : {};
     }
 
     /** The mailbox `address` belongs to, when the caller may send from it (update access to the mailbox), else a 400. */

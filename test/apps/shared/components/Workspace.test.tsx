@@ -13,10 +13,13 @@ import * as crmApi from "../../../../apps/shared/crmApi.js";
 import CrmShell, { WORKSPACE_STORAGE_KEY } from "../../../../apps/shared/components/CrmShell.js";
 import TaskList from "../../../../apps/shared/components/TaskList.js";
 import ImportWizard, { IMPORT_POLL_MS } from "../../../../apps/shared/components/ImportWizard.js";
-import WorkspaceSettings from "../../../../apps/shared/components/WorkspaceSettings.js";
+import WorkspaceSettings, { chipAddress, suggestPeople } from "../../../../apps/shared/components/WorkspaceSettings.js";
 
 vi.mock("../../../../apps/shared/crmApi.js", (importOriginal) => mockCrmApi(importOriginal));
 vi.mock("@rapidmx/web-client/shared/components/layout/AppShell.js", () => ({ default: MockAppShell }));
+const web = vi.hoisted(() => ({ listMailboxes: vi.fn(), searchDirectory: vi.fn() }));
+vi.mock("@rapidmx/web-client/lib/mail/mailApi.js", async (importOriginal) => ({ ...((await importOriginal()) as any), listMailboxes: web.listMailboxes }));
+vi.mock("@rapidmx/web-client/lib/mail/directoryApi.js", async (importOriginal) => ({ ...((await importOriginal()) as any), searchDirectory: web.searchDirectory }));
 
 const api: any = crmApi;
 const assign = vi.fn();
@@ -27,6 +30,9 @@ function inShell(ui: React.ReactElement) {
 
 beforeEach(() => {
     stubBasics(api);
+    web.listMailboxes.mockResolvedValue([]);
+    web.searchDirectory.mockResolvedValue([]);
+    api.sendableMailboxes.mockResolvedValue([]);
     window.localStorage.clear();
     Object.defineProperty(window, "location", { configurable: true, value: { ...window.location, assign, search: "" } });
 });
@@ -186,6 +192,10 @@ describe("WorkspaceSettings", () => {
         expect(screen.getByLabelText("Description")).toHaveValue("Sales team");
         await userEvent.clear(name);
         await userEvent.type(name, "Acme EU");
+        await userEvent.click(screen.getByRole("combobox", { name: "Time zone" }));
+        await userEvent.type(screen.getByRole("searchbox", { name: "Search time zones" }), "tokyo");
+        await userEvent.click(screen.getByRole("option", { name: /Tokyo/ }));
+        expect(screen.getByRole("combobox", { name: "Time zone" })).toHaveTextContent(/Tokyo/);
         await userEvent.click(within(screen.getByRole("form", { name: "Workspace details" })).getByRole("button", { name: "Save" }));
         expect(await screen.findByText("'timezone' must be an IANA time zone.")).toBeInTheDocument();
         await userEvent.click(within(screen.getByRole("form", { name: "Workspace details" })).getByRole("button", { name: "Save" }));
@@ -193,36 +203,93 @@ describe("WorkspaceSettings", () => {
         expect(api.updateWorkspace).toHaveBeenLastCalledWith("w1", {
             name: "Acme EU",
             description: "Sales team",
-            timezone: "UTC",
+            timezone: "Asia/Tokyo",
             postalAddress: "1 Main St",
             website: "https://acme.example",
         });
     });
 
-    it("adds members, changes their roles and removes them", async () => {
-        api.listMembers.mockResolvedValue([member(), member({ uid: "m2", userUid: "u2", role: "editor", displayName: undefined, address: "two@x.example" })]);
-        api.addMember.mockRejectedValueOnce(new ApiRequestError("Nobody on this server has the address x@x.example.", 400)).mockResolvedValue({});
+    it("adds members found by name or address, changes their roles and removes them", async () => {
+        api.listMembers.mockResolvedValue([
+            member({ displayName: "Olive Owner", address: "olive@acme.example" }),
+            member({ uid: "m2", userUid: "u2", role: "editor", displayName: undefined, address: "two@x.example" }),
+            member({ uid: "m3", userUid: "u3", role: "viewer", displayName: undefined, address: undefined }),
+        ]);
+        web.searchDirectory.mockResolvedValue([
+            { displayName: "Arthur Dent", address: "arthur@acme.example", kind: "user" },
+            { displayName: "Support", address: "support@acme.example", kind: "shared" },
+            { displayName: "Everyone", address: "all@acme.example", kind: "list" },
+        ]);
+        api.addMember.mockImplementation(async (_w: string, input: any) => {
+            if (input.address === "nobody@x.example") {
+                throw new ApiRequestError("Nobody on this server has the address nobody@x.example.", 400);
+            }
+            return {};
+        });
         api.updateMember.mockResolvedValue({});
         api.removeMember.mockResolvedValue(undefined);
         inShell(<WorkspaceSettings />);
 
-        await userEvent.selectOptions(await screen.findByLabelText("Role of two@x.example"), "admin");
+        // A member shows their name and address; one known only by uid shows the uid.
+        const members = within(await screen.findByRole("region", { name: "Members" }));
+        expect(await members.findByText("olive@acme.example")).toBeInTheDocument();
+        expect(members.getByText("Olive Owner")).toBeInTheDocument();
+        expect(members.getByText("u3")).toBeInTheDocument();
+        api.updateMember.mockRejectedValueOnce(new Error("x"));
+        await userEvent.selectOptions(screen.getByLabelText("Role of two@x.example"), "viewer");
+        expect(await screen.findByText("Could not change the role.")).toBeInTheDocument();
+        await userEvent.selectOptions(screen.getByLabelText("Role of two@x.example"), "admin");
         expect(api.updateMember).toHaveBeenCalledWith("w1", "u2", "admin");
-        await userEvent.click(within(screen.getByRole("region", { name: "Members" })).getAllByRole("button", { name: "Remove" })[1]);
+        await waitFor(() => expect(screen.queryByText("Could not change the role.")).toBeNull());
+        await userEvent.click(members.getAllByRole("button", { name: "Remove" })[1]);
         expect(api.removeMember).toHaveBeenCalledWith("w1", "u2");
 
-        await userEvent.type(screen.getByLabelText("Member address"), "x@x.example");
+        // Searching offers only people with an account; a pick and a typed address are both added.
+        expect(screen.getByRole("button", { name: "Add member" })).toBeDisabled();
+        await userEvent.type(screen.getByLabelText("People to add"), "arth");
+        const suggestion = await screen.findByRole("option", { name: /Arthur Dent/ });
+        expect(screen.queryByRole("option", { name: /Support/ })).toBeNull();
+        expect(screen.queryByRole("option", { name: /Everyone/ })).toBeNull();
+        await userEvent.click(suggestion);
+        await userEvent.type(screen.getByLabelText("People to add"), "nobody@x.example");
         await userEvent.selectOptions(screen.getByLabelText("New member role"), "viewer");
+        await userEvent.click(screen.getByRole("button", { name: "Add 2 members" }));
+        expect(await screen.findByText(/nobody@x\.example: Nobody on this server has the address nobody@x\.example\./)).toBeInTheDocument();
+        expect(api.addMember).toHaveBeenCalledWith("w1", { address: "arthur@acme.example", role: "viewer" });
+        expect(api.addMember).toHaveBeenCalledWith("w1", { address: "nobody@x.example", role: "viewer" });
+        // What failed stays in the field; once it's gone, nothing is left to add.
+        expect(screen.getByRole("button", { name: "Add member" })).toBeEnabled();
+        await userEvent.click(screen.getByRole("button", { name: /Remove nobody@x\.example/ }));
+        await waitFor(() => expect(screen.getByRole("button", { name: "Add member" })).toBeDisabled());
+
+        api.listMembers.mockRejectedValueOnce(new Error("x"));
+        await userEvent.type(screen.getByLabelText("People to add"), "arthur@acme.example");
         await userEvent.click(screen.getByRole("button", { name: "Add member" }));
-        expect(await screen.findByText("Nobody on this server has the address x@x.example.")).toBeInTheDocument();
-        await userEvent.click(screen.getByRole("button", { name: "Add member" }));
-        await waitFor(() => expect(screen.getByLabelText("Member address")).toHaveValue(""));
-        expect(api.addMember).toHaveBeenLastCalledWith("w1", { address: "x@x.example", role: "viewer" });
+        expect(await screen.findByText("Could not load the members.")).toBeInTheDocument();
+        expect(screen.queryByText(/Nobody on this server/)).toBeNull();
+        expect(api.addMember).toHaveBeenLastCalledWith("w1", { address: "arthur@acme.example", role: "viewer" });
+    });
+
+    it("reads the address out of a people entry, and suggests only people", async () => {
+        expect(chipAddress("Arthur Dent <Arthur@Acme.example>")).toBe("arthur@acme.example");
+        expect(chipAddress(" x@y.example ")).toBe("x@y.example");
+        web.searchDirectory.mockResolvedValue([
+            { displayName: "A", address: "a@x.example", kind: "user" },
+            { displayName: "R", address: "r@x.example", kind: "room" },
+        ]);
+        expect(await suggestPeople("a", { limit: 5 })).toEqual([{ displayName: "A", address: "a@x.example", kind: "user" }]);
+        expect(web.searchDirectory).toHaveBeenCalledWith("a", { limit: 5 });
     });
 
     it("adds and removes senders and custom properties", async () => {
         api.listSenders.mockResolvedValue([{ uid: "s1", fromName: "Acme Sales", fromAddress: "sales@acme.example" }]);
         api.listProperties.mockResolvedValue([property()]);
+        web.listMailboxes.mockResolvedValue([{ uid: "mb1" }, { uid: "mb2" }, { uid: "mb3" }]);
+        api.sendableMailboxes.mockResolvedValue([
+            { uid: "mb1", address: "sales@acme.example", displayName: "Acme Sales" },
+            { uid: "mb2", address: "help@acme.example", displayName: "Help Desk" },
+            { uid: "mb3", address: "noname@acme.example", displayName: "" },
+        ]);
         api.addSender.mockRejectedValueOnce(new Error("x")).mockResolvedValue({});
         api.removeSender.mockResolvedValue(undefined);
         api.createProperty.mockRejectedValueOnce(new Error("x")).mockResolvedValue({});
@@ -231,12 +298,26 @@ describe("WorkspaceSettings", () => {
         inShell(<WorkspaceSettings />);
 
         expect(await screen.findByText("Acme Sales <sales@acme.example>")).toBeInTheDocument();
-        await userEvent.type(screen.getByLabelText("Sender address"), "help@acme.example");
+        // The picker offers the mailboxes the caller can send from, less those already added.
+        const mailbox = await screen.findByLabelText("Mailbox");
+        expect(web.listMailboxes).toHaveBeenCalledWith({ limit: 200 });
+        expect(api.sendableMailboxes).toHaveBeenCalledWith("w1", ["mb1", "mb2", "mb3"]);
+        expect(within(mailbox).getAllByRole("option").map((option) => option.textContent)).toEqual(["Choose a mailbox…", "Help Desk <help@acme.example>", "noname@acme.example"]);
+        expect(screen.getByRole("button", { name: "Add sender" })).toBeDisabled();
+        await userEvent.selectOptions(mailbox, "mb2");
+        expect(screen.getByLabelText("Sender name")).toHaveValue("Help Desk");
         await userEvent.click(screen.getByRole("button", { name: "Add sender" }));
         expect(await screen.findByText("Could not add the sender.")).toBeInTheDocument();
+        expect(api.addSender).toHaveBeenLastCalledWith("w1", { fromAddress: "help@acme.example", fromName: "Help Desk" });
+        await userEvent.clear(screen.getByLabelText("Sender name"));
         await userEvent.type(screen.getByLabelText("Sender name"), "Help");
         await userEvent.click(screen.getByRole("button", { name: "Add sender" }));
         expect(api.addSender).toHaveBeenLastCalledWith("w1", { fromAddress: "help@acme.example", fromName: "Help" });
+        await waitFor(() => expect(screen.getByLabelText("Mailbox")).toHaveValue(""));
+        await userEvent.selectOptions(screen.getByLabelText("Mailbox"), "mb3");
+        expect(screen.getByLabelText("Sender name")).toHaveValue("");
+        await userEvent.click(screen.getByRole("button", { name: "Add sender" }));
+        expect(api.addSender).toHaveBeenLastCalledWith("w1", { fromAddress: "noname@acme.example" });
         await userEvent.click(within(screen.getByRole("region", { name: "Senders" })).getByRole("button", { name: "Remove" }));
         expect(api.removeSender).toHaveBeenCalledWith("w1", "s1");
 
@@ -264,6 +345,29 @@ describe("WorkspaceSettings", () => {
         expect(api.deleteProperty).not.toHaveBeenCalled();
         await userEvent.click(deleteButton);
         expect(api.deleteProperty).toHaveBeenCalledWith("w1", "p1");
+    });
+
+    it("says when there's no mailbox to send from", async () => {
+        inShell(<WorkspaceSettings />);
+        expect(await screen.findByText(/You have no mailbox you can send from/)).toBeInTheDocument();
+        expect(api.sendableMailboxes).not.toHaveBeenCalled();
+        expect(screen.queryByLabelText("Mailbox")).toBeNull();
+    });
+
+    it("hides the sender picker when every mailbox is added already, or the mailboxes can't be listed", async () => {
+        api.listSenders.mockResolvedValue([{ uid: "s1", fromName: "Acme Sales", fromAddress: "sales@acme.example" }]);
+        web.listMailboxes.mockResolvedValue([{ uid: "mb1" }]);
+        api.sendableMailboxes.mockResolvedValue([{ uid: "mb1", address: "sales@acme.example", displayName: "Acme Sales" }]);
+        const first = inShell(<WorkspaceSettings />);
+        expect(await screen.findByText("Acme Sales <sales@acme.example>")).toBeInTheDocument();
+        await waitFor(() => expect(api.sendableMailboxes).toHaveBeenCalled());
+        expect(screen.queryByLabelText("Mailbox")).toBeNull();
+        expect(screen.queryByText(/You have no mailbox/)).toBeNull();
+        first.unmount();
+
+        web.listMailboxes.mockRejectedValue(new Error("down"));
+        inShell(<WorkspaceSettings />);
+        expect(await screen.findByText(/You have no mailbox you can send from/)).toBeInTheDocument();
     });
 
     it("deletes the workspace for an owner who types its name", async () => {
@@ -294,6 +398,8 @@ describe("WorkspaceSettings", () => {
         inShell(<WorkspaceSettings />);
 
         expect(await screen.findByLabelText("Name")).toBeDisabled();
+        expect(screen.getByLabelText("Time zone")).toBeDisabled();
+        expect(web.listMailboxes).not.toHaveBeenCalled();
         expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Delete this workspace" })).not.toBeInTheDocument();
         expect(await screen.findByText("Could not load the members.")).toBeInTheDocument();
