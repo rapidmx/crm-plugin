@@ -26,6 +26,7 @@ import AppShell, { AppShellProps } from "@rapidmx/web-client/shared/components/l
 import Alert from "@rapidmx/web-client/lib/components/feedback/Alert.js";
 import Button from "@rapidmx/web-client/lib/components/buttons/Button.js";
 import FormField from "@rapidmx/web-client/lib/components/forms/FormField.js";
+import Modal from "@rapidmx/web-client/lib/components/overlays/Modal.js";
 import { Workspace, createWorkspace, errorMessage, listWorkspaces } from "../crmApi.js";
 
 /** The props every CRM page receives from the server (the `www` host's), passed straight to its shell. */
@@ -33,6 +34,9 @@ export type CrmPageProps = Omit<AppShellProps, "active">;
 
 /** The CRM's sections, each a page under `/crm`. */
 export type CrmSection = "contacts" | "companies" | "lists" | "deals" | "pipelines" | "segments" | "forms" | "templates" | "campaigns" | "automations" | "scoring" | "tasks" | "imports" | "reports" | "integrations" | "settings";
+
+/** The workspace switcher's choice that opens the "New workspace" dialog rather than switching. */
+export const NEW_WORKSPACE = "__new__";
 
 /** Where the selected workspace is remembered between visits (per browser). */
 export const WORKSPACE_STORAGE_KEY = "rapidmx.crm.workspace";
@@ -112,12 +116,14 @@ function remember(workspaceUid: string): void {
 /**
  * The frame of every CRM page: the web client's app chrome (with CRM highlighted on the app rail), a sidebar with the workspace
  * switcher and the CRM's sections, and the page. It loads the caller's workspaces and picks one (`?w=`, else the last used, else the
- * first); a caller with none is asked to create one. Pages read the selection with `useCrm()`.
+ * first); a caller with none is asked to create one, and the switcher offers to create another. Pages read the selection with
+ * `useCrm()`.
  */
 export default function CrmShell({ section, children, ...props }: PropsWithChildren<CrmPageProps & { section: CrmSection }>) {
     const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null);
     const [selected, setSelected] = useState<Workspace | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [creating, setCreating] = useState<boolean>(false);
 
     async function load(preferred: string | null): Promise<void> {
         try {
@@ -161,12 +167,14 @@ export default function CrmShell({ section, children, ...props }: PropsWithChild
                         <label htmlFor="crm-workspace" className="text-xs uppercase tracking-wide text-text-muted px-2">
                             Workspace
                         </label>
-                        <select id="crm-workspace" className={`${INPUT_CLASS} mb-3`} value={context.workspace.uid} onChange={(event) => switchTo(event.target.value)}>
+                        <select id="crm-workspace" className={`${INPUT_CLASS} mb-3`} value={context.workspace.uid} onChange={(event) => (event.target.value === NEW_WORKSPACE ? setCreating(true) : switchTo(event.target.value))}
+                        >
                             {context.workspaces.map((workspace) => (
                                 <option key={workspace.uid} value={workspace.uid}>
                                     {workspace.name}
                                 </option>
                             ))}
+                            <option value={NEW_WORKSPACE}>+ New workspace…</option>
                         </select>
                         {SECTIONS.map(({ id, label, path, icon: Icon }) => (
                             <a
@@ -187,6 +195,9 @@ export default function CrmShell({ section, children, ...props }: PropsWithChild
                     {error && <Alert>{error}</Alert>}
                     {!error && workspaces === null && <p className="text-sm text-text-muted">Loading&hellip;</p>}
                     {workspaces !== null && !context && <CreateFirstWorkspace onCreated={(workspace) => switchTo(workspace.uid)} />}
+                    <Modal open={creating} onClose={() => setCreating(false)} title="New workspace">
+                        <CreateWorkspaceForm onCreated={(workspace) => switchTo(workspace.uid)} />
+                    </Modal>
                     {context && <CrmContext.Provider value={context}>{children}</CrmContext.Provider>}
                 </main>
             </div>
@@ -196,6 +207,19 @@ export default function CrmShell({ section, children, ...props }: PropsWithChild
 
 /** The form a caller with no workspace sees. */
 export function CreateFirstWorkspace({ onCreated }: { onCreated: (workspace: Workspace) => void }) {
+    return (
+        <div className="max-w-md">
+            <h1 className="text-lg font-bold tracking-tight mb-2">Create your CRM workspace</h1>
+            <p className="text-sm text-text-muted mb-4">
+                A workspace holds your team&apos;s contacts, companies and tasks. You can invite colleagues to it once it exists.
+            </p>
+            <CreateWorkspaceForm onCreated={onCreated} />
+        </div>
+    );
+}
+
+/** Names and creates a workspace (in the browser's time zone - changeable in its settings), then hands it to `onCreated`. */
+export function CreateWorkspaceForm({ onCreated }: { onCreated: (workspace: Workspace) => void }) {
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
@@ -212,11 +236,7 @@ export function CreateFirstWorkspace({ onCreated }: { onCreated: (workspace: Wor
     }
 
     return (
-        <form onSubmit={submit} className="max-w-md">
-            <h1 className="text-lg font-bold tracking-tight mb-2">Create your CRM workspace</h1>
-            <p className="text-sm text-text-muted mb-4">
-                A workspace holds your team&apos;s contacts, companies and tasks. You can invite colleagues to it once it exists.
-            </p>
+        <form onSubmit={submit} className="min-w-[20rem]">
             {error && <Alert>{error}</Alert>}
             <FormField label="Name" htmlFor="crm-new-workspace">
                 <input id="crm-new-workspace" className={INPUT_CLASS} value={name} onChange={(event) => setName(event.target.value)} required />

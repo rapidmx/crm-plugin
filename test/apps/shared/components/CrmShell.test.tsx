@@ -3,14 +3,14 @@
 // Copyright (C) 2026 Jean-Philippe Steinmetz. All rights reserved.
 ///////////////////////////////////////////////////////////////////////////////
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@rapidmx/web-client/lib/util/api.js";
 import { MockAppShell, mockCrmApi, stubBasics, workspace } from "../../fixtures.js";
 import * as crmApi from "../../../../apps/shared/crmApi.js";
-import CrmShell, { WORKSPACE_STORAGE_KEY, useCrm, workspaceHref } from "../../../../apps/shared/components/CrmShell.js";
+import CrmShell, { NEW_WORKSPACE, WORKSPACE_STORAGE_KEY, useCrm, workspaceHref } from "../../../../apps/shared/components/CrmShell.js";
 import CrmContactsPage from "../../../../apps/crm/index.js";
 import CrmCompaniesPage from "../../../../apps/crm/companies/index.js";
 import CrmContactPage from "../../../../apps/crm/contacts/[uid].js";
@@ -124,6 +124,31 @@ describe("CrmShell", () => {
         await waitFor(() => expect(assign).toHaveBeenCalledWith("/crm/tasks?w=new"));
         expect(api.createWorkspace).toHaveBeenCalledWith({ name: "Sales", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
         expect(screen.queryByText("never shown")).not.toBeInTheDocument();
+    });
+
+    it("creates another workspace from the switcher, and opens it", async () => {
+        api.listWorkspaces.mockResolvedValue([workspace(), workspace({ uid: "w2", name: "Beta" })]);
+        api.createWorkspace.mockRejectedValueOnce(new ApiRequestError("You may create at most 10 workspaces.", 400)).mockResolvedValue(workspace({ uid: "new" }));
+        render(<CrmShell section="contacts">page</CrmShell>);
+        const switcher = await screen.findByLabelText("Workspace");
+        expect(within(switcher).getAllByRole("option").map((option) => option.textContent)).toEqual(["Acme", "Beta", "+ New workspace…"]);
+
+        // Choosing it opens the dialog, without switching; closing it changes nothing.
+        await userEvent.selectOptions(switcher, NEW_WORKSPACE);
+        const dialog = await screen.findByRole("dialog", { name: "New workspace" });
+        expect(assign).not.toHaveBeenCalled();
+        expect(switcher).toHaveValue("w1");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+        await userEvent.selectOptions(switcher, NEW_WORKSPACE);
+        const again = await screen.findByRole("dialog", { name: "New workspace" });
+        await userEvent.type(within(again).getByLabelText("Name"), "Partners");
+        await userEvent.click(within(again).getByRole("button", { name: "Create workspace" }));
+        expect(await within(again).findByText("You may create at most 10 workspaces.")).toBeInTheDocument();
+        await userEvent.click(within(again).getByRole("button", { name: "Create workspace" }));
+        await waitFor(() => expect(assign).toHaveBeenCalledWith("/crm/tasks?w=new"));
+        expect(api.createWorkspace).toHaveBeenLastCalledWith({ name: "Partners", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     });
 
     it("says so when the workspaces can't be loaded", async () => {
