@@ -8,7 +8,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@rapidmx/web-client/lib/util/api.js";
-import { MockAppShell, automation, emailTemplate, list, member, mockCrmApi, segment, stubBasics, workspace } from "../../fixtures.js";
+import { MockAppShell, automation, emailTemplate, list, member, mockCrmApi, property, segment, stubBasics, workspace } from "../../fixtures.js";
 import * as crmApi from "../../../../apps/shared/crmApi.js";
 import CrmShell from "../../../../apps/shared/components/CrmShell.js";
 import AutomationList from "../../../../apps/shared/components/automations/AutomationList.js";
@@ -73,6 +73,17 @@ afterEach(() => {
 });
 
 describe("AutomationList", () => {
+    it("creates a birthday greeting that lets contacts through every year", async () => {
+        api.createAutomation.mockResolvedValue(automation({ uid: "new" }));
+        inShell(<AutomationList />);
+        await userEvent.click(await screen.findByRole("button", { name: "+ New automation" }));
+        await userEvent.type(screen.getByLabelText("Name"), "Birthdays");
+        await userEvent.click(screen.getByLabelText(/Birthday greeting/));
+        await userEvent.click(button("Create"));
+        await waitFor(() => expect(api.createAutomation).toHaveBeenCalled());
+        expect(api.createAutomation.mock.lastCall[1]).toMatchObject({ reentry: "after_exit", graph: { nodes: [{ config: { event: "date.reached" } }, {}] } });
+    });
+
     it("lists, creates from a recipe and deletes automations", async () => {
         api.listAutomations.mockResolvedValue([automation({ description: "Hello", status: "active", publishedAt: "2026-09-30T10:00:00.000Z" }), automation({ uid: "a2", name: "Nurture" })]);
         api.createAutomation.mockRejectedValueOnce(new ApiRequestError("Too many.", 400)).mockResolvedValue(automation({ uid: "new" }));
@@ -91,6 +102,7 @@ describe("AutomationList", () => {
         await userEvent.click(button("Create"));
         await waitFor(() => expect(window.location.assign).toHaveBeenCalledWith("/crm/automations/new?w=w1"));
         expect(api.createAutomation.mock.lastCall[1].graph.nodes).toHaveLength(6);
+        expect(api.createAutomation.mock.lastCall[1].reentry).toBeUndefined();
         await userEvent.click(button("Close"));
 
         await userEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
@@ -277,6 +289,51 @@ describe("AutomationEditor", () => {
         expect(nodes["webhook-1"]).toEqual({ endpointUid: "w1" });
     });
 
+    it("starts from a date: which one, before or after it, every year or once, and from what hour", async () => {
+        api.listProperties.mockResolvedValue([property({ uid: "p2", key: "birthday", label: "Birthday", type: "date", options: [] }), property()]);
+        api.updateAutomation.mockImplementation(async (_w: string, _u: string, input: any) => automation({ ...input }));
+        await renderEditor(automation({ graph: { nodes: [{ id: "trigger", type: "trigger", config: { event: "list.subscribed" } }, { id: "end", type: "exit" }], edges: [{ from: "trigger", to: "end", port: "next" }] } }));
+        await select("trigger");
+        await userEvent.selectOptions(settings().getByLabelText("When a contact"), "date.reached");
+        expect(button("Step trigger")).toHaveTextContent("On a date…, every year, from 09:00");
+        const dates = within(settings().getByLabelText("Date")).getAllByRole("option").map((option) => option.textContent);
+        expect(dates).toEqual(["Choose a date…", "Date added", "Last engaged", "Birthday"]);
+        await userEvent.selectOptions(settings().getByLabelText("Date"), "properties.birthday");
+        expect(button("Step trigger")).toHaveTextContent("On birthday, every year, from 09:00");
+        expect(settings().queryByLabelText("Days")).toBeNull();
+
+        await userEvent.selectOptions(settings().getByLabelText("When"), "before");
+        expect(button("Step trigger")).toHaveTextContent("1 day before birthday");
+        await userEvent.clear(settings().getByLabelText("Days"));
+        await userEvent.type(settings().getByLabelText("Days"), "7");
+        expect(button("Step trigger")).toHaveTextContent("7 days before birthday");
+        await userEvent.selectOptions(settings().getByLabelText("When"), "after");
+        expect(button("Step trigger")).toHaveTextContent("7 days after birthday");
+        await userEvent.clear(settings().getByLabelText("Days"));
+        expect(button("Step trigger")).toHaveTextContent("1 day after birthday");
+        await userEvent.type(settings().getByLabelText("Days"), "999");
+        expect(button("Step trigger")).toHaveTextContent("365 days after birthday");
+        await userEvent.selectOptions(settings().getByLabelText("When"), "on");
+        await userEvent.selectOptions(settings().getByLabelText("Date"), "lastEngagedAt");
+        await userEvent.selectOptions(settings().getByLabelText("Repeat"), "once");
+        await userEvent.selectOptions(settings().getByLabelText("From (workspace time)"), "14");
+        expect(button("Step trigger")).toHaveTextContent("On Last engaged, once, from 14:00");
+        await userEvent.selectOptions(settings().getByLabelText("Date"), "");
+
+        await userEvent.selectOptions(settings().getByLabelText("Date"), "dateCreated");
+        await userEvent.click(button("Save draft"));
+        const trigger = api.updateAutomation.mock.lastCall[2].graph.nodes.find((node: any) => node.id === "trigger").config;
+        expect(trigger).toMatchObject({ event: "date.reached", dateField: "dateCreated", offsetDays: 0, repeat: "once", hour: 14 });
+
+        // Another event drops the date settings.
+        await userEvent.selectOptions(settings().getByLabelText("When a contact"), "contact.created");
+        expect(settings().queryByLabelText("Date")).toBeNull();
+        await userEvent.click(button("Save draft"));
+        const other = api.updateAutomation.mock.lastCall[2].graph.nodes.find((node: any) => node.id === "trigger").config;
+        expect(other.dateField ?? null).toBeNull();
+        expect(other.hour ?? null).toBeNull();
+    });
+
     it("describes steps with missing settings", () => {
         const data: any = { lists: [], forms: [], segments: [], templates: [], senders: [], members: [], automations: [], webhooks: [] };
         const node = (type: string, config: Record<string, unknown> = {}) => describeStep({ id: "x", type: type as any, config }, data);
@@ -293,6 +350,8 @@ describe("AutomationEditor", () => {
         expect(node("create_task")).toBe('Create the task "…"');
         expect(node("notify")).toBe("Notify a member");
         expect(node("trigger", { event: "custom" })).toBe("When a contact has an event reported by your systems (api)");
+        expect(node("trigger", { event: "date.reached", dateField: "properties.renewal", offsetDays: -1, repeat: "once", hour: 0 })).toBe("1 day before renewal, once, from 00:00");
+        expect(node("trigger", { event: "date.reached", dateField: 5, offsetDays: "x", hour: "y" })).toBe("On a date…, every year, from 09:00");
     });
 
     it("publishes (saving first), pauses and resumes, and shows the numbers", async () => {

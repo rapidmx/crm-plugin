@@ -76,3 +76,4 @@ export { AutomationTriggerJobSQL } from "./jobs/sql/AutomationTriggerJobSQL.js";
 export { AutomationRunJobSQL } from "./jobs/sql/AutomationRunJobSQL.js";
 export { TaskReminderJobSQL } from "./jobs/sql/TaskReminderJobSQL.js";
 export { WebhookDeliveryJobSQL } from "./jobs/sql/WebhookDeliveryJobSQL.js";
+export { DateTriggerJobSQL } from "./jobs/sql/DateTriggerJobSQL.js";

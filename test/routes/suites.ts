@@ -15,6 +15,7 @@ import { segmentSuite } from "./segmentSuite.js";
 import { automationSuite } from "./automationSuite.js";
 import { dealSuite } from "./dealSuite.js";
 import { integrationSuite } from "./integrationSuite.js";
+import { dateSuite } from "./dateSuite.js";
 import { workspaceSuite } from "./workspaceSuite.js";
 
 export function runCrmSuites(ctx: CrmTestContext): void {
@@ -30,4 +31,5 @@ export function runCrmSuites(ctx: CrmTestContext): void {
     automationSuite(ctx);
     dealSuite(ctx);
     integrationSuite(ctx);
+    dateSuite(ctx);
 }

@@ -25,6 +25,11 @@ export enum CrmEventType {
     DEAL_LOST = "deal.lost",
     /** Something the workspace's own systems reported through the integration API (`data.name` says what). */
     CUSTOM = "custom",
+    /**
+     * A contact reached a date (a birthday, a renewal, their signup anniversary): never an event of its own - `DateTriggerJob` puts
+     * contacts into automations with this trigger directly.
+     */
+    DATE_REACHED = "date.reached",
     /** A member put the contact in (`POST /automations/:ws/:uid/enroll`, or another automation's `enroll` step). */
     MANUAL = "manual",
 }

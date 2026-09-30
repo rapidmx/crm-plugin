@@ -76,3 +76,4 @@ export { AutomationTriggerJobMongo } from "./jobs/mongo/AutomationTriggerJobMong
 export { AutomationRunJobMongo } from "./jobs/mongo/AutomationRunJobMongo.js";
 export { TaskReminderJobMongo } from "./jobs/mongo/TaskReminderJobMongo.js";
 export { WebhookDeliveryJobMongo } from "./jobs/mongo/WebhookDeliveryJobMongo.js";
+export { DateTriggerJobMongo } from "./jobs/mongo/DateTriggerJobMongo.js";

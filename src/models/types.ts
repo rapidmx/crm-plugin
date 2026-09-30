@@ -767,6 +767,8 @@ export interface Automation extends CrmEntity {
     publishedVersionUid?: string;
     publishedAt?: Date;
     createdByUserUid: string;
+    /** The workspace-local day (`YYYY-MM-DD`) its date trigger last put contacts in (`DateTriggerJob`). */
+    dateCheckedOn?: string;
 }
 
 /** An automation's graph as published. Immutable: running enrollments keep going through the version they entered. */

@@ -25,9 +25,19 @@ import { INPUT_CLASS, useCrm } from "../CrmShell.js";
 import FilterBuilder, { buildFilter, draftOf } from "../FilterBuilder.js";
 import { useSegmentFields } from "../SegmentManager.js";
 import { FlowStep, PORT_LABELS, STEP_TYPES, configure, connect, insertStep, layout, removeStep, stepLabel } from "./flowModel.js";
-import StepInspector, { AutomationData, TRIGGER_EVENTS, useAutomationData } from "./StepInspector.js";
+import StepInspector, { AutomationData, OWN_DATES, TRIGGER_EVENTS, hourLabel, useAutomationData } from "./StepInspector.js";
 
 const STATUS_LABELS: Record<string, string> = { draft: "Draft", active: "Active", paused: "Paused" };
+
+/** A date trigger in a sentence: "7 days before Birthday, every year, from 09:00". */
+export function describeDateTrigger(config: Record<string, unknown>): string {
+    const field: string = typeof config.dateField === "string" ? config.dateField : "";
+    const name: string = OWN_DATES.find((entry) => entry.value === field)?.label ?? (field ? field.replace(/^properties\./, "") : "a date…");
+    const offset: number = typeof config.offsetDays === "number" ? config.offsetDays : 0;
+    const days = (count: number): string => `${count} day${count === 1 ? "" : "s"}`;
+    const when: string = offset === 0 ? `On ${name}` : offset < 0 ? `${days(-offset)} before ${name}` : `${days(offset)} after ${name}`;
+    return `${when}, ${config.repeat === "once" ? "once" : "every year"}, from ${hourLabel(typeof config.hour === "number" ? config.hour : 9)}`;
+}
 
 /** A step in a sentence, for its box on the flow. */
 export function describeStep(node: AutomationNode, data: AutomationData): string {
@@ -35,6 +45,9 @@ export function describeStep(node: AutomationNode, data: AutomationData): string
     const name = (records: { uid: string; name: string }[], uid: unknown, fallback: string) => records.find((record) => record.uid === uid)?.name ?? fallback;
     switch (node.type) {
         case "trigger":
+            if (config.event === "date.reached") {
+                return describeDateTrigger(config);
+            }
             return `When a contact ${(TRIGGER_EVENTS.find((entry) => entry.value === config.event)?.label ?? "…").toLowerCase()}${config.event === "custom" && config.name ? ` named "${config.name}"` : ""}`;
         case "delay":
             return `Wait ${config.amount ?? "?"} ${config.unit ?? ""}`;

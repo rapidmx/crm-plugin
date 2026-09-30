@@ -112,7 +112,7 @@ function NewAutomationModal({ open, onClose, onCreated }: { open: boolean; onClo
         event.preventDefault();
         setSaving(true);
         try {
-            onCreated(await createAutomation(workspace.uid, { name: name.trim(), graph: RECIPES[recipe].graph }));
+            onCreated(await createAutomation(workspace.uid, { name: name.trim(), graph: RECIPES[recipe].graph, ...(RECIPES[recipe].reentry ? { reentry: RECIPES[recipe].reentry } : {}) }));
         } catch (err) {
             setError(errorMessage(err, "Could not create the automation."));
             setSaving(false);

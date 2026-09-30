@@ -15,7 +15,7 @@ const { Get, Param, Post, User: AuthUser } = RouteDecorators;
 /** How many webhook endpoints one workspace may have. */
 export const MAX_WEBHOOKS = 20;
 /** The event types an endpoint may take, besides `*` (all). */
-export const WEBHOOK_EVENTS: readonly string[] = [...Object.values(CrmEventType).filter((type) => type !== CrmEventType.MANUAL), "automation.webhook"];
+export const WEBHOOK_EVENTS: readonly string[] = [...Object.values(CrmEventType).filter((type) => type !== CrmEventType.MANUAL && type !== CrmEventType.DATE_REACHED), "automation.webhook"];
 
 /** An endpoint as the API shows it: its secret only as its last characters. */
 export interface WebhookEndpointView extends Omit<WebhookEndpoint, "secret"> {

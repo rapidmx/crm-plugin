@@ -63,6 +63,9 @@ This first release covers the CRM core:
   - **Triggers:** subscribing or unsubscribing, submitting a form, entering or leaving a segment, being created or changed,
     opening, clicking, replying to or bouncing an email, a deal being created, moved, won or lost, an event your own systems
     report through the integration API (optionally by name), or being put in by hand. A trigger can also take a contact filter.
+  - **Date triggers:** a contact's date property (a birthday, a renewal) or when they were added or last engaged - on the day or
+    a number of days before or after it, every year or once, from a chosen hour in the workspace's time zone. A "Birthday
+    greeting" starting point sets one up.
   - **Steps:** waiting a while; waiting for an earlier email to be opened, clicked or replied to (with a timeout, and a branch
     for each outcome); if/else on a contact filter; random splits; sending an email; setting a field; adding or removing a tag;
     subscribing or unsubscribing; creating a task; notifying a member; putting the contact into another automation; posting to
@@ -129,6 +132,7 @@ Replies, bounces and complaints are learned from restapi's mail event stream, so
 | `mail:crm:jobs:reminders:schedule`, `...:lead_minutes` | `15 * * * * *`, `15` | How task reminders are sent, and how long before a task is due. |
 | `mail:crm:jobs:automations:schedule`, `...:batch`, `...:lease_seconds`, `...:paused_retry_seconds` | `*/5 * * * * *`, `100`, `120`, `60` | How contacts are moved through automations. |
 | `mail:crm:jobs:webhooks:schedule`, `...:max_attempts`, `...:retention_days` | `*/5 * * * * *`, `8`, `14` | How webhooks are posted and retried, and how long deliveries are kept. |
+| `mail:crm:jobs:dates:schedule` | `20 * * * * *` | How often date-triggered automations are checked (each puts contacts in once a day). |
 
 ## API
 

@@ -75,6 +75,11 @@ export class AutomationMongo extends BaseMongoEntity implements Automation {
     @Description("The member who created it.")
     public createdByUserUid: string = "";
 
+    @Column({ nullable: true })
+    @Description("The workspace-local day (YYYY-MM-DD) its date trigger last put contacts in.")
+    @Nullable
+    public dateCheckedOn?: string;
+
     constructor(other?: Partial<AutomationMongo>) {
         super(other);
 
@@ -89,6 +94,7 @@ export class AutomationMongo extends BaseMongoEntity implements Automation {
             this.publishedVersionUid = "publishedVersionUid" in other ? other.publishedVersionUid : this.publishedVersionUid;
             this.publishedAt = "publishedAt" in other ? other.publishedAt : this.publishedAt;
             this.createdByUserUid = other.createdByUserUid !== undefined ? other.createdByUserUid : this.createdByUserUid;
+            this.dateCheckedOn = "dateCheckedOn" in other ? other.dateCheckedOn : this.dateCheckedOn;
         }
     }
 }

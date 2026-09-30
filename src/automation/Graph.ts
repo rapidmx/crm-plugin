@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 ///////////////////////////////////////////////////////////////////////////////
 import { badRequest, isObject } from "../util/Validation.js";
+import { readDateTrigger } from "./Dates.js";
 import { CrmEventType } from "./Events.js";
 
 /** What an automation step does. */
@@ -141,6 +142,8 @@ export interface GraphReferences {
     members: Set<string>;
     pipelines: Set<string>;
     webhooks: Set<string>;
+    /** Custom contact properties date triggers start from (their keys), to check are date properties. */
+    dateProperties: Set<string>;
     /** Contact filters (triggers, conditions), to validate against the workspace's fields. */
     filters: unknown[];
 }
@@ -199,7 +202,7 @@ export function validateForPublish(graph: AutomationGraph): GraphReferences {
     }
     checkLoops(graph);
 
-    const references: GraphReferences = { templates: new Set(), senders: new Set(), lists: new Set(), forms: new Set(), segments: new Set(), automations: new Set(), members: new Set(), pipelines: new Set(), webhooks: new Set(), filters: [] };
+    const references: GraphReferences = { templates: new Set(), senders: new Set(), lists: new Set(), forms: new Set(), segments: new Set(), automations: new Set(), members: new Set(), pipelines: new Set(), webhooks: new Set(), dateProperties: new Set(), filters: [] };
     for (const node of graph.nodes) {
         const where: string = `Step ${node.id}`;
         const config: Record<string, unknown> = node.config;
@@ -216,6 +219,12 @@ export function validateForPublish(graph: AutomationGraph): GraphReferences {
                 ] as const) {
                     if (config[field] !== undefined && config[field] !== null && config[field] !== "") {
                         set.add(text(config, field, where, 64));
+                    }
+                }
+                if (config.event === CrmEventType.DATE_REACHED) {
+                    const { field } = readDateTrigger(config, where);
+                    if (field.startsWith("properties.")) {
+                        references.dateProperties.add(field.slice("properties.".length));
                     }
                 }
                 if (config.filter !== undefined && config.filter !== null) {

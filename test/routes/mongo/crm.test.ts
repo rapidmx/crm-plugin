@@ -20,6 +20,7 @@ import { AutomationTriggerJobMongo } from "../../../src/jobs/mongo/AutomationTri
 import { AutomationRunJobMongo } from "../../../src/jobs/mongo/AutomationRunJobMongo.js";
 import { TaskReminderJobMongo } from "../../../src/jobs/mongo/TaskReminderJobMongo.js";
 import { WebhookDeliveryJobMongo } from "../../../src/jobs/mongo/WebhookDeliveryJobMongo.js";
+import { DateTriggerJobMongo } from "../../../src/jobs/mongo/DateTriggerJobMongo.js";
 import { registerTestDoubles, type InMemoryBlobStore, type RecordingMailTransport } from "../../testDoubles.js";
 import { CrmTestContext, TestUser } from "../context.js";
 import { runCrmSuites } from "../suites.js";
@@ -109,7 +110,7 @@ describe("CRM routes (Mongo)", () => {
         blobStore: () => objectFactory.getInstance<InMemoryBlobStore>("BlobStore") as InMemoryBlobStore,
         importJob: async () => await objectFactory.newInstance(CrmImportJobMongo, { name: `import-${uuid.v4()}` }),
         job: async (name) =>
-            await objectFactory.newInstance({ campaign: CampaignJobMongo, send: SendDispatchJobMongo, events: CrmMailEventJobMongo, segments: SegmentRefreshJobMongo, scoring: ScoringJobMongo, triggers: AutomationTriggerJobMongo, automations: AutomationRunJobMongo, reminders: TaskReminderJobMongo, webhooks: WebhookDeliveryJobMongo }[name], { name: `${name}-${uuid.v4()}` }),
+            await objectFactory.newInstance({ campaign: CampaignJobMongo, send: SendDispatchJobMongo, events: CrmMailEventJobMongo, segments: SegmentRefreshJobMongo, scoring: ScoringJobMongo, triggers: AutomationTriggerJobMongo, automations: AutomationRunJobMongo, reminders: TaskReminderJobMongo, webhooks: WebhookDeliveryJobMongo, dates: DateTriggerJobMongo }[name], { name: `${name}-${uuid.v4()}` }),
         repo: async (name: string) => await repos.get(name as any),
         pushed: () => pushed,
         route: (name: string) => objectFactory.getInstance(`routes.${name}`),

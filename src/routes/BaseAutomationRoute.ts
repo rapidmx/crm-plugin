@@ -14,9 +14,12 @@ import {
     AutomationStatus,
     AutomationVersion,
     CrmContact,
+    CrmObjectType,
     Enrollment,
     EnrollmentState,
     OutboundSend,
+    PropertyDefinition,
+    PropertyType,
     WorkspaceAction,
 } from "../models/types.js";
 import { contactFilterFields } from "../segments/Segments.js";
@@ -138,6 +141,18 @@ export abstract class BaseAutomationRoute extends BaseWorkspaceRecordRoute<Autom
                 if (!(await check(uid))) {
                     throw badRequest(`A step names ${noun} that doesn't exist: ${uid}.`);
                 }
+            }
+        }
+        const definitions = await this.repo<PropertyDefinition>("propertyDefinition");
+        for (const key of references.dateProperties) {
+            const definition: PropertyDefinition | undefined = (
+                await definitions.find(
+                    { workspaceUid: ModelUtils.literal(workspaceUid), objectType: ModelUtils.literal(CrmObjectType.CONTACT), key: ModelUtils.literal(key) },
+                    { ignoreACL: true, limit: 1, skipCache: true },
+                )
+            )[0];
+            if (definition?.type !== PropertyType.DATE) {
+                throw badRequest(`The trigger's date must be a contact date property; '${key}' isn't one.`);
             }
         }
         for (const filter of references.filters) {

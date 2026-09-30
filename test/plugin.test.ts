@@ -116,6 +116,7 @@ describe("plugin entry points", () => {
             [`AutomationRunJob${suffix}`]: "job",
             [`TaskReminderJob${suffix}`]: "job",
             [`WebhookDeliveryJob${suffix}`]: "job",
+            [`DateTriggerJob${suffix}`]: "job",
         };
         for (const [model] of MODELS) {
             expected[`${model}${suffix}`] = `model ${datastore}${model === "WorkspaceSender" ? " mailbox-scoped" : ""}`;

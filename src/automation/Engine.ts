@@ -52,7 +52,7 @@ export async function contactMatches(repos: CrmRepos, contact: CrmContact, filte
 /** Whether `event` starts an automation whose trigger step is `trigger` - before the trigger's contact filter, if it has one. */
 export function triggerMatches(trigger: AutomationNode, event: Pick<CrmEvent, "type" | "data">): boolean {
     const config: Record<string, unknown> = trigger.config;
-    if (config.event !== event.type || event.type === CrmEventType.MANUAL) {
+    if (config.event !== event.type || event.type === CrmEventType.MANUAL || event.type === CrmEventType.DATE_REACHED) {
         return false;
     }
     for (const field of ["listUid", "formUid", "segmentUid", "pipelineUid", "stageId"] as const) {

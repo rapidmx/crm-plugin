@@ -248,6 +248,16 @@ Keep entries terse — this is a reference, not a transcript.
   `SendDispatchJob` push that workspace's due messages `STOPPED_RETRY_MS` (15 min) later instead of sending them. The admin app is
   `apps/admin-crm` (host `admin`, mount `/admin/crm`, `adminNav` id `crm`), wrapped in web-client's `AdminShell`.
 
+- **Date triggers.** Trigger `event: "date.reached"` with `dateField` (`dateCreated`, `lastEngagedAt` or `properties.<key>` of a
+  contact date property - checked at publish), `offsetDays` (-365..365; negative = before), `repeat` (`yearly`/`once`) and `hour`
+  (0-23, workspace time). Never a `CrmEvent`: `triggerMatches` refuses it and webhooks don't offer it. `DateTriggerJob` (every
+  minute) claims each active automation's day by stamping `Automation.dateCheckedOn` (version-checked) once the workspace-local
+  hour is reached, then enrolls the matching contacts through the engine, so re-entry rules apply - a yearly date needs
+  `after_exit` (the "Birthday greeting" recipe sets it). Missed days aren't made up. A custom date is its UTC day (dates are stored
+  as UTC midnight); the contact's own fields are moments, taken in the workspace's zone. 29 February comes round on the 28th.
+  One-off dates are range-queried; yearly ones read every value of the field (capped at `MAX_DATE_SCAN`). `dateCreated` can't be
+  changed through `RepoUtils.update` (service-core protects it), which the tests work around.
+
 ## Session Log
 
 ### 2026-09-29 — Phase 1: the plugin created
@@ -341,3 +351,8 @@ Keep entries terse — this is a reference, not a transcript.
   posted to a real receiver - both wait for JP's end-to-end testing. The plan's "allowed sender domains" and global rate limit in
   the admin app weren't built: the rate limit is already the `send_rate_per_minute` setting, and senders are already limited to
   mailboxes the member can send as.
+
+### 2026-09-30 — Date-based triggers
+
+- JP asked for them after Phase 8. New `src/automation/Dates.ts`, `DateTriggerJob`, `Automation.dateCheckedOn`, the date trigger's
+  settings in the step inspector, and a "Birthday greeting" recipe (recipes can now set `reentry`). 582 tests.

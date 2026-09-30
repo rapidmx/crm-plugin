@@ -6,7 +6,7 @@
  * The automation editor's graph edits and layout, as pure functions over an `AutomationGraph`: each returns a new graph and leaves
  * the one it was given alone.
  */
-import type { AutomationEdge, AutomationGraph, AutomationNode, NodeType } from "../../crmApi.js";
+import type { AutomationEdge, AutomationGraph, AutomationNode, AutomationReentry, NodeType } from "../../crmApi.js";
 
 /** The ports out of each step type, as the server has them. */
 export const PORTS: Readonly<Record<NodeType, readonly string[]>> = {
@@ -239,6 +239,8 @@ export interface Recipe {
     name: string;
     description: string;
     graph: AutomationGraph;
+    /** Whether contacts may go through again (a yearly date needs it). */
+    reentry?: AutomationReentry;
 }
 
 /** The automations the "New automation" dialog offers to start from. Their emails and lists are left for the member to choose. */
@@ -259,6 +261,18 @@ export const RECIPES: Recipe[] = [
                 { from: "welcome", to: "wait-1", port: "next" },
                 { from: "wait-1", to: "follow-up", port: "timeout" },
             ],
+        },
+    },
+    {
+        name: "Birthday greeting",
+        description: "An email on each contact's birthday, every year. Choose the date property that holds it.",
+        reentry: "after_exit",
+        graph: {
+            nodes: [
+                { id: "trigger", type: "trigger", config: { event: "date.reached", repeat: "yearly", offsetDays: 0, hour: 9 } },
+                { id: "greeting", type: "send_email", config: {} },
+            ],
+            edges: [{ from: "trigger", to: "greeting", port: "next" }],
         },
     },
     {

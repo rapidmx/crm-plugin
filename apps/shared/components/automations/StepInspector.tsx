@@ -90,6 +90,7 @@ export const TRIGGER_EVENTS: { value: string; label: string }[] = [
     { value: "deal.stage_changed", label: "Has a deal move to another stage" },
     { value: "deal.won", label: "Has a deal won" },
     { value: "deal.lost", label: "Has a deal lost" },
+    { value: "date.reached", label: "Reaches a date (birthday, renewal, anniversary…)" },
     { value: "custom", label: "Has an event reported by your systems (API)" },
     { value: "manual", label: "Is put in by hand (or by another automation)" },
 ];
@@ -105,6 +106,51 @@ const UNITS: { value: string; label: string }[] = [
     { value: "hours", label: "hours" },
     { value: "days", label: "days" },
 ];
+
+/** The contact's own dates a date trigger can start from, besides its date properties. */
+export const OWN_DATES: { value: string; label: string }[] = [
+    { value: "dateCreated", label: "Date added" },
+    { value: "lastEngagedAt", label: "Last engaged" },
+];
+
+const DATE_WHEN: { value: string; label: string }[] = [
+    { value: "on", label: "On the date" },
+    { value: "before", label: "Days before" },
+    { value: "after", label: "Days after" },
+];
+
+const REPEATS: { value: string; label: string }[] = [
+    { value: "yearly", label: "Every year" },
+    { value: "once", label: "Once" },
+];
+
+/** `hour` as a time of day ("09:00"). */
+export function hourLabel(hour: number): string {
+    return `${String(hour).padStart(2, "0")}:00`;
+}
+
+const HOURS: { value: string; label: string }[] = Array.from({ length: 24 }, (_value, hour) => ({ value: String(hour), label: hourLabel(hour) }));
+
+/** A date trigger's settings: the date, days before or after it, every year or once, and from what hour. */
+function DateSettings({ config, onChange }: { config: Record<string, unknown>; onChange: (patch: Record<string, unknown>) => void }) {
+    const fields = useSegmentFields();
+    const dates = [...OWN_DATES, ...fields.filter((field) => field.kind === "date" && field.name.startsWith("properties.")).map((field) => ({ value: field.name, label: field.label }))];
+    const offset: number = typeof config.offsetDays === "number" ? config.offsetDays : 0;
+    const when: string = offset < 0 ? "before" : offset > 0 ? "after" : "on";
+    return (
+        <>
+            <Select label="Date" value={config.dateField} options={dates} empty="Choose a date…" onChange={(dateField) => onChange({ dateField: dateField || undefined })} />
+            <Select label="When" value={when} options={DATE_WHEN} onChange={(next) => onChange({ offsetDays: next === "on" ? 0 : (next === "before" ? -1 : 1) * Math.max(1, Math.abs(offset)) })} />
+            {when !== "on" && <WholeNumber label="Days" value={Math.abs(offset)} onChange={(days) => onChange({ offsetDays: (when === "before" ? -1 : 1) * Math.min(365, Math.max(1, days ?? 1)) })} />}
+            <Select label="Repeat" value={config.repeat ?? "yearly"} options={REPEATS} onChange={(repeat) => onChange({ repeat })} />
+            <Select label="From (workspace time)" value={String(config.hour ?? 9)} options={HOURS} onChange={(hour) => onChange({ hour: Number(hour) })} />
+            <p className="text-xs text-text-muted mb-3">
+                Contacts are put in once a day. For a date that comes round every year, let contacts go through again (the automation's settings) or they only
+                get it the first time.
+            </p>
+        </>
+    );
+}
 
 const SETTABLE: { value: string; label: string }[] = [
     { value: "lifecycleStage", label: "Lifecycle stage" },
@@ -193,7 +239,8 @@ export default function StepInspector({
         case "trigger":
             fields = (
                 <>
-                    <Select label="When a contact" value={config.event} options={TRIGGER_EVENTS} onChange={(event) => onChange({ event, listUid: undefined, formUid: undefined, segmentUid: undefined, pipelineUid: undefined, stageId: undefined, fields: undefined, name: undefined })} />
+                    <Select label="When a contact" value={config.event} options={TRIGGER_EVENTS} onChange={(event) => onChange({ event, listUid: undefined, formUid: undefined, segmentUid: undefined, pipelineUid: undefined, stageId: undefined, fields: undefined, name: undefined, ...(event === "date.reached" ? { repeat: "yearly", offsetDays: 0, hour: 9 } : { dateField: undefined, repeat: undefined, offsetDays: undefined, hour: undefined }) })} />
+                    {config.event === "date.reached" && <DateSettings config={config} onChange={onChange} />}
                     {config.event === "custom" && <Text label="Event name (empty: any event)" value={config.name} onChange={set("name")} />}
                     {(config.event === "list.subscribed" || config.event === "list.unsubscribed") && (
                         <Select label="List" value={config.listUid} options={names(data.lists)} empty="Any list" onChange={set("listUid")} />
