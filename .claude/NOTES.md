@@ -258,6 +258,10 @@ Keep entries terse — this is a reference, not a transcript.
   One-off dates are range-queried; yearly ones read every value of the field (capped at `MAX_DATE_SCAN`). `dateCreated` can't be
   changed through `RepoUtils.update` (service-core protects it), which the tests work around.
 
+- **`@swc/core` is pinned to 1.16.2** (the version booking-plugin and meet-plugin resolve). 1.16.12's Linux binary refuses to
+  load in the CI container (`ERR_SWC_NATIVE_CACHE`: "cache root /github/home/.cache has a parent writable by another user"), which
+  breaks vitest's config load. Don't loosen the pin without checking CI.
+
 ## Session Log
 
 ### 2026-09-29 — Phase 1: the plugin created
