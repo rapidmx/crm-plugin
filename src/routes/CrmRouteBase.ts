@@ -26,6 +26,7 @@ import {
 import { MergeContext, sampleContext } from "../templates/Render.js";
 import { buildMergeContext } from "../templates/MergeContext.js";
 import { readValues } from "../util/PropertyValues.js";
+import { readOrCreateTokenSecret } from "../util/Secrets.js";
 import { TokenPayload, signToken } from "../util/Tokens.js";
 import { assertWorkspaceAccess, notFound } from "../util/WorkspaceAccess.js";
 import { badRequest } from "../util/Validation.js";
@@ -35,7 +36,6 @@ const { Config, Inject, Logger } = ObjectDecorators;
 export const LISTS_KEY = "lists";
 
 /** The `CrmSetting` key of the generated token signing key. */
-const TOKEN_SECRET_KEY = "token-secret";
 
 /** Who or what changed a subscription, and from where. */
 export interface SubscriptionChange {
@@ -84,10 +84,15 @@ export abstract class CrmRouteBase {
     private crmRepos?: CrmRepos;
     private cachedTokenSecret?: string;
 
+    /** The repositories of every model. */
+    protected repos(): CrmRepos {
+        this.crmRepos ??= new CrmRepos(this._objectFactory!, this.classes);
+        return this.crmRepos;
+    }
+
     /** The repository of `name`'s model. */
     protected async repo<T = any>(name: CrmModelName) {
-        this.crmRepos ??= new CrmRepos(this._objectFactory!, this.classes);
-        return await this.crmRepos.get<T>(name);
+        return await this.repos().get<T>(name);
     }
 
     /** Refuses a caller without `action` on `workspaceUid` - see `assertWorkspaceAccess()`. */
@@ -237,8 +242,7 @@ export abstract class CrmRouteBase {
     }
 
     /**
-     * The key tokens are signed with: `mail:crm:token_secret`, or else one generated on first use and kept as a `CrmSetting`, so every
-     * server copy signs and checks with the same key. Two copies generating one at once both read back whichever was saved first.
+     * The key tokens are signed with: `mail:crm:token_secret`, or else the generated one (`readOrCreateTokenSecret()`).
      */
     protected async tokenSecret(): Promise<string> {
         if (this.configuredTokenSecret) {
@@ -247,22 +251,7 @@ export abstract class CrmRouteBase {
         if (this.cachedTokenSecret) {
             return this.cachedTokenSecret;
         }
-        const repo: RepoUtils<CrmSetting> = await this.repo<CrmSetting>("setting");
-        const find = async (): Promise<CrmSetting | undefined> =>
-            (await repo.find({ key: ModelUtils.literal(TOKEN_SECRET_KEY) }, { ignoreACL: true, limit: 1, skipCache: true }))[0];
-        let setting: CrmSetting | undefined = await find();
-        if (!setting) {
-            try {
-                setting = await repo.create(new this.classes.setting({ key: TOKEN_SECRET_KEY, value: crypto.randomBytes(32).toString("base64url") }), {
-                    ignoreACL: true,
-                    skipPush: true,
-                });
-            } catch {
-                // Another copy saved one first (the key is unique): use theirs.
-                setting = await find();
-            }
-        }
-        this.cachedTokenSecret = setting!.value;
+        this.cachedTokenSecret = await readOrCreateTokenSecret(await this.repo<CrmSetting>("setting"), this.classes.setting);
         return this.cachedTokenSecret;
     }
 

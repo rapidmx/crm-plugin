@@ -22,6 +22,8 @@ export interface CrmTestContext {
     blobStore: () => InMemoryBlobStore;
     /** A new `CrmImportJob` of the harness's backend. */
     importJob: () => Promise<any>;
+    /** A new `CampaignJob`, `SendDispatchJob` or `CrmMailEventJob` of the harness's backend. */
+    job: (name: "campaign" | "send" | "events") => Promise<any>;
     /** The `RepoUtils` of one of `CrmModelClasses`' models, for looking behind the API. */
     repo: (name: string) => Promise<any>;
     /** Every message pushed with `NotificationUtils.sendMessage()` since the last `clearPushed()`. */

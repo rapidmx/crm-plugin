@@ -535,3 +535,125 @@ export const listSavedBlocks = (workspaceUid: string): Promise<SavedBlock[]> => 
 export const createSavedBlock = (workspaceUid: string, input: { name: string; blocks: DesignBlock[] }): Promise<SavedBlock> =>
     apiFetch(`/mail/crm/saved-blocks/${enc(workspaceUid)}`, json("POST", input));
 export const deleteSavedBlock = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/saved-blocks/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+
+// Campaigns
+
+export type CampaignStatus = "draft" | "scheduled" | "preparing" | "sending" | "paused" | "sent" | "cancelled" | "failed";
+export type AbMetric = "open" | "click" | "reply";
+
+export interface CampaignVariant {
+    id: string;
+    subject?: string;
+    templateUid?: string;
+}
+
+export interface AbTest {
+    variants: CampaignVariant[];
+    testPercent: number;
+    metric: AbMetric;
+    testHours: number;
+    winnerId?: string;
+    decidedAt?: string;
+}
+
+export interface CampaignCounts {
+    recipients: number;
+    sent: number;
+    failed: number;
+    suppressed: number;
+    bounced: number;
+    opened: number;
+    clicked: number;
+    replied: number;
+    unsubscribed: number;
+    complained: number;
+}
+
+export interface CampaignStats extends CampaignCounts {
+    variants?: Record<string, CampaignCounts>;
+}
+
+export interface Campaign extends Stored {
+    workspaceUid: string;
+    name: string;
+    status: CampaignStatus;
+    templateUid?: string | null;
+    senderUid?: string | null;
+    listUids: string[];
+    excludeListUids: string[];
+    trackOpens: boolean;
+    trackClicks: boolean;
+    abTest?: AbTest | null;
+    scheduledAt?: string | null;
+    startedAt?: string | null;
+    finishedAt?: string | null;
+    recipientCount: number;
+    stats: CampaignStats;
+    error?: string | null;
+}
+
+export interface CampaignProblem {
+    field: string;
+    message: string;
+}
+
+export type SendStatus = "queued" | "held" | "sent" | "failed" | "suppressed" | "cancelled";
+
+/** One message of a campaign, as its recipients list shows it. */
+export interface CampaignRecipient extends Stored {
+    contactUid: string;
+    email: string;
+    variantId: string;
+    status: SendStatus;
+    sentAt?: string;
+    error?: string;
+    firstOpenedAt?: string;
+    openCount: number;
+    firstClickedAt?: string;
+    clickCount: number;
+    repliedAt?: string;
+    bouncedAt?: string;
+    bounceType?: string;
+    complainedAt?: string;
+    unsubscribedAt?: string;
+}
+
+export interface LinkClicks {
+    url: string;
+    clicks: number;
+    uniqueClicks: number;
+}
+
+export interface CampaignReport {
+    campaign: Campaign;
+    stats: CampaignStats;
+    links: LinkClicks[];
+}
+
+export type CampaignInput = Partial<Pick<Campaign, "name" | "templateUid" | "senderUid" | "listUids" | "excludeListUids" | "trackOpens" | "trackClicks" | "abTest" | "version">>;
+
+const campaignPath = (workspaceUid: string, suffix: string = "") => `/mail/crm/campaigns/${enc(workspaceUid)}${suffix}`;
+
+/** A page of the workspace's campaigns, newest first. */
+export const searchCampaigns = (workspaceUid: string, page: number, limit: number = 50): Promise<SearchResult<Campaign>> =>
+    apiFetch(campaignPath(workspaceUid, "/search"), json("POST", { limit, page }));
+export const getCampaign = (workspaceUid: string, uid: string): Promise<Campaign> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}`));
+export const createCampaign = (workspaceUid: string, input: CampaignInput): Promise<Campaign> => apiFetch(campaignPath(workspaceUid), json("POST", input));
+export const updateCampaign = (workspaceUid: string, uid: string, input: CampaignInput): Promise<Campaign> =>
+    apiFetch(campaignPath(workspaceUid, `/${enc(uid)}`), json("PUT", input));
+export const deleteCampaign = (workspaceUid: string, uid: string): Promise<void> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}`), json("DELETE"));
+export const duplicateCampaign = (workspaceUid: string, uid: string): Promise<Campaign> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/duplicate`), json("POST", {}));
+export const campaignChecklist = (workspaceUid: string, uid: string): Promise<CampaignProblem[]> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/checklist`));
+export const scheduleCampaign = (workspaceUid: string, uid: string, sendAt?: string): Promise<Campaign> =>
+    apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/schedule`), json("POST", sendAt ? { sendAt } : {}));
+/** Moves a campaign along: back to a draft, paused, resumed or cancelled. */
+export const changeCampaign = (workspaceUid: string, uid: string, action: "unschedule" | "pause" | "resume" | "cancel"): Promise<Campaign> =>
+    apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/${action}`), json("POST", {}));
+export const campaignAudience = (workspaceUid: string, input: { listUids: string[]; excludeListUids: string[] }): Promise<{ count: number; capped: boolean }> =>
+    apiFetch(campaignPath(workspaceUid, "/audience"), json("POST", input));
+export const campaignReport = (workspaceUid: string, uid: string): Promise<CampaignReport> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/report`));
+export const campaignRecipients = (
+    workspaceUid: string,
+    uid: string,
+    query: { status?: SendStatus; engagement?: string; q?: string; page: number; limit?: number },
+): Promise<SearchResult<CampaignRecipient>> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/recipients`), json("POST", query));

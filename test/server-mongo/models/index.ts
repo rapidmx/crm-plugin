@@ -20,3 +20,6 @@ export { CrmFormMongo } from "../../../src/models/mongo/CrmFormMongo.js";
 export { CrmSettingMongo } from "../../../src/models/mongo/CrmSettingMongo.js";
 export { EmailTemplateMongo } from "../../../src/models/mongo/EmailTemplateMongo.js";
 export { SavedBlockMongo } from "../../../src/models/mongo/SavedBlockMongo.js";
+export { CampaignMongo } from "../../../src/models/mongo/CampaignMongo.js";
+export { OutboundSendMongo } from "../../../src/models/mongo/OutboundSendMongo.js";
+export { EngagementEventMongo } from "../../../src/models/mongo/EngagementEventMongo.js";

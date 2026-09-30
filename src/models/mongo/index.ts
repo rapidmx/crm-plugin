@@ -4,6 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 import { MailboxMongo } from "@rapidmx/restapi/mongo";
 import type { CrmModelClasses } from "../CrmModelClasses.js";
+import { CampaignMongo } from "./CampaignMongo.js";
 import { CrmCompanyMongo } from "./CrmCompanyMongo.js";
 import { CrmContactMongo } from "./CrmContactMongo.js";
 import { CrmFormMongo } from "./CrmFormMongo.js";
@@ -12,7 +13,9 @@ import { CrmNoteMongo } from "./CrmNoteMongo.js";
 import { CrmSettingMongo } from "./CrmSettingMongo.js";
 import { CrmTaskMongo } from "./CrmTaskMongo.js";
 import { EmailTemplateMongo } from "./EmailTemplateMongo.js";
+import { EngagementEventMongo } from "./EngagementEventMongo.js";
 import { MailingListMongo } from "./MailingListMongo.js";
+import { OutboundSendMongo } from "./OutboundSendMongo.js";
 import { PropertyDefinitionMongo } from "./PropertyDefinitionMongo.js";
 import { PropertyValueMongo } from "./PropertyValueMongo.js";
 import { SavedBlockMongo } from "./SavedBlockMongo.js";
@@ -43,5 +46,8 @@ export const MONGO_MODELS: CrmModelClasses = {
     setting: CrmSettingMongo,
     template: EmailTemplateMongo,
     savedBlock: SavedBlockMongo,
+    campaign: CampaignMongo,
+    outboundSend: OutboundSendMongo,
+    engagementEvent: EngagementEventMongo,
     mailbox: MailboxMongo,
 };

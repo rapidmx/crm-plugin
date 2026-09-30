@@ -65,6 +65,11 @@ export abstract class BaseWorkspaceRecordRoute<T extends WorkspaceRecord, V = T>
         // Nothing by default.
     }
 
+    /** Refuses a delete (throws) when `record` can't go yet. */
+    protected async beforeDelete(_record: T): Promise<void> {
+        // Anything may be deleted by default.
+    }
+
     /** Whatever a delete removes besides the record itself. */
     protected async afterDelete(_record: T, _context: WriteContext): Promise<void> {
         // Nothing by default.
@@ -176,6 +181,7 @@ export abstract class BaseWorkspaceRecordRoute<T extends WorkspaceRecord, V = T>
     public async remove(@Param("workspaceUid") workspaceUid: string, @Param("uid") uid: string, @AuthUser user?: JWTUser): Promise<void> {
         await this.requireAccess(user, workspaceUid, this.writeAction);
         const existing: T = await this.requireRecord(workspaceUid, uid);
+        await this.beforeDelete(existing);
         await (await this.records()).delete(existing.uid, { ignoreACL: true, purge: true, skipPush: true });
         await this.afterDelete(existing, { workspaceUid, user: user! });
         this.notify(workspaceUid, this.pushType, "delete", { uid: existing.uid });

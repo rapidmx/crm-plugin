@@ -123,6 +123,42 @@ Keep entries terse — this is a reference, not a transcript.
   - Text blocks are edited inline with TipTap (`LazyTextBlockEditor`, loaded client-only).
   - HTML blocks show as code on the canvas. Only the sandboxed preview iframe draws arbitrary HTML.
   - Save sends `version`, so a stale save answers 409.
+- **Sending pipeline** (Phase 4). One `OutboundSend` row per recipient per campaign.
+  - `dedupeKey` (`campaign:<c>:<contact>`, later `automation:<enrollment>:<node>`) is unique, so nobody is mailed twice.
+  - `token` (22 base64url chars) names the message in its `Message-ID` (`<token>@<sender domain>`), in its tracking links and in
+    its VERP address.
+- **`CampaignJob`** moves campaigns through `scheduled -> preparing -> sending -> sent`.
+  - Each step is a version-checked `save()`; a lost race answers `undefined`, which is how a member's pause or cancel stops the job.
+  - Preparation reads subscriptions in uid order from `audienceCursor`, `pagesPerRun` pages per run. It releases the lease at the
+    end of each run, so any replica continues.
+  - The final `recipientCount` is *counted* from the sends, not added up. Adding up undercounted after a replayed page, and could
+    reach 0, marking a campaign `sent` with its messages still queued (caught by a test).
+  - A/B: `assignVariant()` hashes campaign+contact. Test messages are queued; the rest are `held` with variant `""` until the
+    winner is picked, then released in batches.
+- **`SendDispatchJob`**:
+  - It leases each message (version-checked) and re-checks eligibility at send time: still subscribed to a campaign list, active,
+    not suppressed.
+  - It renders with `CampaignRenderer` (caches per run).
+  - Throughput is capped by a shared `RateLimiter` counter `crm-send|all` (Redis when there is a cache connection). Tests mock it.
+  - A temporary failure backs off 1, 2, 4... minutes. A permanent failure with `5.1.x` counts as a hard bounce.
+- **Tracking.**
+  - Click links carry the destination, signed with the token key (`clickPath()`/`verifyClick()`). There's no stored link table and
+    no open redirect.
+  - `isMachine()` flags scanners (by user agent) and anything within 2s of sending. Stats' `opened` excludes `machineOpen`.
+  - Tests backdate `sentAt` before opening.
+  - The framework's `HttpResponse` has no `redirect()`: set `location` and `status(302).end()`.
+- **Engagement.** `EngagementRecorder` is the single place outcomes are applied: the event row, the send's counters and
+  first-times (retried on version conflicts), and the contact follow-up (lastEngagedAt, suppression plus emailStatus on a hard
+  bounce or complaint, timeline).
+- **Mail events.** `CrmMailEventJob` reads restapi's stream (`rapidmx:mail-events`, group `crm-plugin`) **with its own minimal
+  reader and mirrored types**, because the plugin still builds against restapi 0.26, which doesn't export `MailEventConsumer`.
+  - **Once restapi 0.27 is the dependency, make it a `MailEventConsumer` subclass and drop the copies.**
+  - Reports and replies only count when filed into the mailbox of the message's own sender (anti-forgery).
+- **Unsubscribe tokens** now carry every campaign list (`l`) and the send (`s`). `POST /public/unsubscribe/:token` unsubscribes
+  from each list and records the unsubscribe on the send; `GET` redirects to the landing page, for people following the
+  `List-Unsubscribe` address.
+- **GDPR.** Deleting a contact deletes their sends and engagement events too. Deleting a workspace deletes every workspace model:
+  Phase 2/3 models had been missing from `WORKSPACE_DATA`, fixed in Phase 4.
 
 ## Session Log
 
@@ -161,3 +197,17 @@ Keep entries terse — this is a reference, not a transcript.
   recorded. The merge decision is now made before `setHistory`.
 - **UX fix:** number fields no longer clamp while you type, so "200" can be typed without it turning into 16.
 - **Flaky test fixed:** a Phase 2 test ("Awaiting confirmation") raced the list load. It now waits for the text.
+
+### 2026-09-30 — Phase 4: campaigns, sending, tracking, engagement
+
+- **New models:** `Campaign`, `OutboundSend` and `EngagementEvent`.
+- **New routes:** `campaigns` and `t` (tracking).
+- **New jobs:** `CampaignJob`, `SendDispatchJob` and `CrmMailEventJob`, sharing `CrmJobBase`.
+- **New UI pages:** `/crm/campaigns` (list) and `/crm/campaigns/<uid>` (the editor while a draft or scheduled, the report after).
+- **Bugs fixed:**
+  - `WORKSPACE_DATA` was missing lists, subscriptions, suppressions, forms, templates and saved blocks, so a workspace delete left
+    them orphaned.
+  - The campaign lease blocked the next run until it expired.
+  - The recipient count after a replayed page (see above).
+- **Not verified end to end:** real bounces, complaints and replies. They need restapi 0.27's stream and a server with an `events`
+  datastore; the handler is tested directly and through a fake Redis.

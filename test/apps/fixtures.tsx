@@ -80,6 +80,10 @@ export function stubBasics(api: any, overrides: { workspaces?: any[] } = {}): vo
     api.searchTemplates.mockResolvedValue({ items: [], total: 0 });
     api.listMergeTags.mockResolvedValue([]);
     api.listSavedBlocks.mockResolvedValue([]);
+    api.searchCampaigns.mockResolvedValue({ items: [], total: 0 });
+    api.campaignChecklist.mockResolvedValue([]);
+    api.campaignAudience.mockResolvedValue({ count: 0, capped: false });
+    api.campaignRecipients.mockResolvedValue({ items: [], total: 0 });
 }
 
 export function list(overrides: Record<string, unknown> = {}): any {
@@ -125,6 +129,30 @@ export function emailTemplate(overrides: Record<string, unknown> = {}): any {
                 { id: "s2", columns: [{ id: "c2", blocks: [{ id: "b-foot", type: "footer" }] }] },
             ],
         },
+        ...stored,
+        ...overrides,
+    };
+}
+
+export function counts(overrides: Record<string, number> = {}): any {
+    return { recipients: 0, sent: 0, failed: 0, suppressed: 0, bounced: 0, opened: 0, clicked: 0, replied: 0, unsubscribed: 0, complained: 0, ...overrides };
+}
+
+export function campaign(overrides: Record<string, unknown> = {}): any {
+    return {
+        uid: "cp1",
+        workspaceUid: "w1",
+        name: "Launch",
+        status: "draft",
+        templateUid: null,
+        senderUid: null,
+        listUids: [],
+        excludeListUids: [],
+        trackOpens: true,
+        trackClicks: true,
+        abTest: null,
+        recipientCount: 0,
+        stats: counts(),
         ...stored,
         ...overrides,
     };

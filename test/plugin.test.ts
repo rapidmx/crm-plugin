@@ -48,6 +48,15 @@ const MODELS: [string, string, string, string[], boolean][] = [
     ["CrmSetting", "crm_setting", "CrmSetting", ["crm_setting_key"], false],
     ["EmailTemplate", "email_template", "CrmEmailTemplate", ["crm_template_workspace_name"], false],
     ["SavedBlock", "saved_block", "CrmSavedBlock", ["crm_savedblock_workspace"], false],
+    ["Campaign", "campaign", "CrmCampaign", ["crm_campaign_workspace", "crm_campaign_status"], false],
+    [
+        "OutboundSend",
+        "outbound_send",
+        "CrmOutboundSend",
+        ["crm_send_dedupe", "crm_send_token", "crm_send_source", "crm_send_due", "crm_send_message", "crm_send_contact", "crm_send_workspace"],
+        false,
+    ],
+    ["EngagementEvent", "engagement_event", "CrmEngagementEvent", ["crm_engagement_source", "crm_engagement_contact", "crm_engagement_send", "crm_engagement_workspace"], false],
 ];
 
 const ROUTES: [string, string][] = [
@@ -66,6 +75,8 @@ const ROUTES: [string, string][] = [
     ["Public", "public"],
     ["Template", "templates"],
     ["SavedBlock", "saved-blocks"],
+    ["Campaign", "campaigns"],
+    ["Tracking", "t"],
 ];
 
 describe("plugin entry points", () => {
@@ -73,7 +84,12 @@ describe("plugin entry points", () => {
         ["mongo", MongoEntry, "Mongo", "mongo"],
         ["sql", SqlEntry, "SQL", "sql"],
     ])("./%s exports only the mounted routes, the models and the import job", (_name, entry, suffix, datastore) => {
-        const expected: Record<string, string> = { [`CrmImportJob${suffix}`]: "job" };
+        const expected: Record<string, string> = {
+            [`CrmImportJob${suffix}`]: "job",
+            [`CampaignJob${suffix}`]: "job",
+            [`SendDispatchJob${suffix}`]: "job",
+            [`CrmMailEventJob${suffix}`]: "job",
+        };
         for (const [model] of MODELS) {
             expected[`${model}${suffix}`] = `model ${datastore}${model === "WorkspaceSender" ? " mailbox-scoped" : ""}`;
         }
@@ -116,6 +132,8 @@ describe("plugin manifest", () => {
             "mail:crm:public_url",
             "mail:crm:workspace_creator_roles",
             "mail:crm:max_workspaces_per_user",
+            "mail:crm:send_rate_per_minute",
+            "mail:crm:verp",
         ]);
         expect(manifest.settings[0].default).toBe("https://<host>");
     });

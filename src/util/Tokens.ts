@@ -15,8 +15,10 @@ export interface TokenPayload {
     w: string;
     /** The contact. */
     c: string;
-    /** The lists it concerns (a confirmation's lists; an unsubscribe link's one list - none: every list). */
+    /** The lists it concerns (a confirmation's lists; an unsubscribe link's lists - none: every list). */
     l?: string[];
+    /** The outbound message an unsubscribe link came in, so the unsubscribe counts in its campaign's statistics. */
+    s?: string;
     /** When it stops working, in seconds since the epoch. None: it doesn't. */
     x?: number;
 }
@@ -71,6 +73,7 @@ export function verifyToken(token: unknown, secret: string, purpose: TokenPurpos
         typeof payload.w !== "string" ||
         typeof payload.c !== "string" ||
         (payload.l !== undefined && (!Array.isArray(payload.l) || payload.l.some((uid) => typeof uid !== "string"))) ||
+        (payload.s !== undefined && typeof payload.s !== "string") ||
         (payload.x !== undefined && (typeof payload.x !== "number" || payload.x * 1000 < now.getTime()))
     ) {
         return undefined;

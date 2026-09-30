@@ -20,3 +20,6 @@ export { CrmFormSQL } from "../../../src/models/sql/CrmFormSQL.js";
 export { CrmSettingSQL } from "../../../src/models/sql/CrmSettingSQL.js";
 export { EmailTemplateSQL } from "../../../src/models/sql/EmailTemplateSQL.js";
 export { SavedBlockSQL } from "../../../src/models/sql/SavedBlockSQL.js";
+export { CampaignSQL } from "../../../src/models/sql/CampaignSQL.js";
+export { OutboundSendSQL } from "../../../src/models/sql/OutboundSendSQL.js";
+export { EngagementEventSQL } from "../../../src/models/sql/EngagementEventSQL.js";

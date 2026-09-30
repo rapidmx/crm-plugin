@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 ///////////////////////////////////////////////////////////////////////////////
 import { ObjectDecorators } from "@rapidrest/core";
-import { HttpRequest, ModelUtils, RateLimiter, RepoUtils, RouteDecorators } from "@rapidrest/service-core";
+import { HttpRequest, HttpResponse, ModelUtils, RateLimiter, RepoUtils, RouteDecorators } from "@rapidrest/service-core";
 import { type MailTransport, rateLimitKeyForIp, resolveClientIp } from "@rapidmx/restapi";
 import {
     CrmCompany,
@@ -11,8 +11,10 @@ import {
     CrmForm,
     CrmObjectType,
     EmailStatus,
+    EngagementType,
     FormField,
     MailingList,
+    OutboundSend,
     PropertyDefinition,
     PropertyType,
     PropertyValue,
@@ -26,11 +28,12 @@ import type { BaseContactRoute } from "./BaseContactRoute.js";
 import { CrmRouteBase } from "./CrmRouteBase.js";
 import { sendSystemMessage, simpleHtml } from "../util/Mailer.js";
 import { readValues } from "../util/PropertyValues.js";
-import { TokenPayload, verifyToken } from "../util/Tokens.js";
+import { EngagementRecorder } from "../sending/Engagement.js";
+import { MAX_TOKEN_LENGTH, TokenPayload, verifyToken } from "../util/Tokens.js";
 import { badRequest, isObject, readEmail, readText } from "../util/Validation.js";
 import { notFound } from "../util/WorkspaceAccess.js";
 const { Config, Inject } = ObjectDecorators;
-const { Get, Param, Post, Request } = RouteDecorators;
+const { Get, Param, Post, Request, Response } = RouteDecorators;
 
 /** How long a double opt-in confirmation link works, in days. */
 export const CONFIRM_TOKEN_DAYS = 7;
@@ -237,23 +240,52 @@ export abstract class BasePublicRoute extends CrmRouteBase {
         return await this.preferencesView(workspace, (await this.findContact(workspace.uid, contact.uid))!);
     }
 
-    /** One-click unsubscribe. Answers with a preferences token, so the landing page can offer the preference center. */
+    /**
+     * The landing page of an unsubscribe link, for a `GET` of the address a message's `List-Unsubscribe` header gives (mail clients
+     * `POST` it; a person following it gets the page with its button). Unsubscribes nothing itself.
+     */
+    @Get("/unsubscribe/:token")
+    public async unsubscribePage(@Param("token") token: string, @Response res: HttpResponse): Promise<void> {
+        res.setHeader("location", this.publicLink(`/subscriptions/unsubscribe/${encodeURIComponent(String(token).slice(0, MAX_TOKEN_LENGTH))}`));
+        res.status(302).end();
+    }
+
+    /**
+     * One-click unsubscribe, from the link's lists (every list and all email when it names none, or none of them exists any more).
+     * A link from a campaign message counts the unsubscribe in that campaign's statistics. Answers with a preferences token, so the
+     * landing page can offer the preference center.
+     */
     @Post("/unsubscribe/:token")
     public async unsubscribe(@Param("token") token: string, @Request req: HttpRequest): Promise<{ workspaceName: string; list?: string; preferencesToken: string }> {
         await this.limit("unsubscribe", req);
         const { payload, workspace, contact } = await this.resolveToken(token, "unsub");
         const ip: string | undefined = this.clientAddress(req);
         const preferencesToken: string = await this.token({ p: "prefs", w: workspace.uid, c: contact.uid });
-        const listUid: string | undefined = payload.l?.[0];
-        if (listUid) {
+        await this.countUnsubscribe(payload, contact);
+        const names: string[] = [];
+        for (const listUid of payload.l ?? []) {
             const list: MailingList | undefined = await this.findList(workspace.uid, listUid);
             if (list) {
                 await this.setSubscription(workspace.uid, listUid, contact.uid, SubscriptionStatus.UNSUBSCRIBED, { source: "unsubscribe-link", ip });
-                return { workspaceName: workspace.name, list: list.publicName, preferencesToken };
+                names.push(list.publicName);
             }
+        }
+        if (names.length > 0) {
+            return { workspaceName: workspace.name, list: names.join(", "), preferencesToken };
         }
         await this.unsubscribeAll(workspace.uid, contact, "unsubscribe-link", ip);
         return { workspaceName: workspace.name, preferencesToken };
+    }
+
+    /** Records the unsubscribe on the outbound message the link came in, if it names one of the contact's. */
+    private async countUnsubscribe(payload: TokenPayload, contact: CrmContact): Promise<void> {
+        if (!payload.s) {
+            return;
+        }
+        const send: OutboundSend | undefined = await (await this.repo<OutboundSend>("outboundSend")).findOne(payload.s, { ignoreACL: true, skipCache: true });
+        if (send?.contactUid === contact.uid) {
+            await new EngagementRecorder(this.repos(), this.classes, this.logger).record(send, EngagementType.UNSUBSCRIBED);
+        }
     }
 
     /** Counts one request of `kind` against the caller's address. */

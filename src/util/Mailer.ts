@@ -14,6 +14,8 @@ export interface SystemMessage {
     text: string;
     html: string;
     headers?: Record<string, string>;
+    /** The `Message-ID` header, with angle brackets; generated when not given. */
+    messageId?: string;
 }
 
 /** Escapes text for HTML. */
@@ -45,6 +47,7 @@ export async function composeMessage(message: SystemMessage): Promise<Buffer> {
         text: message.text,
         html: message.html,
         headers: message.headers,
+        messageId: message.messageId,
     })
         .compile()
         .build();

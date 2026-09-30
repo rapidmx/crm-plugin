@@ -30,12 +30,33 @@ This first release covers the CRM core:
 
   Templates are laid out with MJML and filled in with Liquid; merged values are HTML-escaped.
 
-Campaigns, engagement tracking, automations and sales pipelines follow in later releases.
+- **Campaigns** to the subscribers of chosen lists, less those of excluded lists. They skip addresses that are suppressed,
+  unsubscribed, bounced or complained. A campaign can be sent now or scheduled, paused, resumed and cancelled. Before sending, a
+  checklist says what's missing: a sender, a list, an email with an unsubscribe link, or your postal address.
+- **A/B tests**: up to four variants, each with its own subject line or template. They are tried on part of the audience, and the
+  variant with the best open, click or reply rate after a set number of hours goes to everyone else.
+- **Deliverability headers** on every campaign message:
+  - `List-Unsubscribe` with RFC 8058 one-click, which Gmail and Yahoo require of bulk senders;
+  - `List-Id`, `Precedence: bulk` and a `Feedback-ID`;
+  - a per-message bounce address (VERP).
+
+  Sending is throttled deployment-wide.
+- **Engagement tracking**:
+  - Opens are tracked with an invisible image, and clicks through signed redirects that can only go where the email's link went.
+  - Replies, bounces and spam complaints are learned from the sender's mailbox.
+  - Opens and clicks by mail scanners are told apart from people's.
+  - A hard bounce or a complaint suppresses the address.
+  - Everything lands on the contact's timeline and in the campaign's report: rates, links by clicks, variants, and a filterable
+    recipients list.
+
+Automations, segments and sales pipelines follow in later releases.
 
 ## Installing
 
 Install it from the admin console's **Plugins** page, or preinstall it by adding `@rapidmx/crm-plugin` to `system:plugins:defaults`.
 The CRM then appears on the web client's app rail, at `/crm`. It requires `@rapidmx/restapi` 0.26 or later.
+Replies, bounces and complaints are learned from restapi's mail event stream, so they need a restapi release that publishes it
+(0.27) and an `events` Redis datastore.
 
 ### Settings
 
@@ -52,6 +73,11 @@ The CRM then appears on the web client's app rail, at `/crm`. It requires `@rapi
 | `mail:crm:jobs:import:schedule` | `*/5 * * * * *` | How often queued imports are picked up. |
 | `mail:crm:jobs:import:lease_seconds` | `300` | How long a server may work on an import before another may take it over. |
 | `mail:crm:jobs:import:max_attempts` | `3` | How many times an import is started before it is failed. |
+| `mail:crm:send_rate_per_minute` | `600` | The most campaign messages the whole deployment sends per minute. |
+| `mail:crm:verp` | `true` | Give each campaign message its own bounce address (`<sender>+b-<token>@<domain>`). Needs plus-addressing. |
+| `mail:crm:jobs:send:schedule`, `...:batch`, `...:lease_seconds`, `...:max_attempts` | `*/2 * * * * *`, `200`, `300`, `5` | How the dispatcher runs and retries. |
+| `mail:crm:jobs:campaign:schedule`, `...:lease_seconds`, `...:pages_per_run`, `...:page_size`, `...:stats_seconds` | `*/5 * * * * *`, `120`, `20`, `500`, `60` | How campaigns are prepared and their stats counted. |
+| `mail:crm:jobs:events:schedule` | `*/2 * * * * *` | How often the mail event stream is read. |
 
 ## API
 
@@ -70,7 +96,9 @@ A deployment administrator has no access to a workspace they aren't a member of.
 | `subscriptions` | `GET /:workspaceUid?listUid=&contactUid=&status=`, `POST /:workspaceUid` (`{ listUid, contactUids, status }`) |
 | `templates` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `GET /:workspaceUid/merge-tags`, `POST /:workspaceUid/render`, `POST /:workspaceUid/:uid/test`, `POST /:workspaceUid/:uid/duplicate` |
 | `saved-blocks` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
-| `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `POST /unsubscribe/:token` |
+| `campaigns` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/audience`, `GET /:workspaceUid/:uid/checklist`, `POST /:workspaceUid/:uid/schedule` (`{ sendAt? }`), `POST /:workspaceUid/:uid/unschedule\|pause\|resume\|cancel\|duplicate`, `GET /:workspaceUid/:uid/report`, `POST /:workspaceUid/:uid/recipients` |
+| `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `GET/POST /unsubscribe/:token` |
+| `t` (anonymous) | `GET /o/:token` (open image), `GET /c/:token/:index?u=&s=` (tracked link) |
 
 A search takes `{ filter, q, sort: { field, direction }, limit, page }` and answers `{ items, total }`. A filter is a condition
 `{ field, op, value }` or a group `{ and: [...] }` / `{ or: [...] }`. Fields are a record's own fields, `tags`, or

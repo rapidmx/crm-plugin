@@ -136,14 +136,19 @@ export abstract class BaseContactRoute extends BaseTaggedRecordRoute<CrmContact>
         return companies.length === 1 ? companies[0].uid : undefined;
     }
 
-    /** Deleting contacts deletes their subscriptions too (their `lists` values go with the rest of their values). */
+    /**
+     * Deleting contacts deletes their subscriptions (their `lists` values go with the rest of their values), and the messages sent to
+     * them and what came of those - nothing personal stays behind in campaign statistics.
+     */
     protected override async deleteRelated(uids: string[], workspaceUid: string): Promise<void> {
         await super.deleteRelated(uids, workspaceUid);
         if (uids.length > 0) {
-            await (await this.repo("subscription")).truncate(
-                { workspaceUid: ModelUtils.literal(workspaceUid), contactUid: ModelUtils.literal(uids, "in") },
-                { ignoreACL: true, skipPush: true },
-            );
+            for (const name of ["subscription", "outboundSend", "engagementEvent"] as const) {
+                await (await this.repo(name)).truncate(
+                    { workspaceUid: ModelUtils.literal(workspaceUid), contactUid: ModelUtils.literal(uids, "in") },
+                    { ignoreACL: true, skipPush: true },
+                );
+            }
         }
     }
 

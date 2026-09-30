@@ -164,6 +164,38 @@ describe("crmApi", () => {
         ]);
     });
 
+    it("calls each campaign endpoint", async () => {
+        const calls = recordCalls(() => jsonResponse(200, {}));
+        await api.searchCampaigns("w", 1);
+        await api.getCampaign("w", "c");
+        await api.createCampaign("w", { name: "C" });
+        await api.updateCampaign("w", "c", { name: "D", version: 2 });
+        await api.deleteCampaign("w", "c");
+        await api.duplicateCampaign("w", "c");
+        await api.campaignChecklist("w", "c");
+        await api.scheduleCampaign("w", "c");
+        await api.scheduleCampaign("w", "c", "2026-10-01T09:00:00.000Z");
+        await api.changeCampaign("w", "c", "pause");
+        await api.campaignAudience("w", { listUids: ["l"], excludeListUids: [] });
+        await api.campaignReport("w", "c");
+        await api.campaignRecipients("w", "c", { status: "sent", page: 0 });
+        expect(calls).toEqual([
+            'POST /api/mail/crm/campaigns/w/search {"limit":50,"page":1}',
+            "GET /api/mail/crm/campaigns/w/c",
+            'POST /api/mail/crm/campaigns/w {"name":"C"}',
+            'PUT /api/mail/crm/campaigns/w/c {"name":"D","version":2}',
+            "DELETE /api/mail/crm/campaigns/w/c",
+            "POST /api/mail/crm/campaigns/w/c/duplicate {}",
+            "GET /api/mail/crm/campaigns/w/c/checklist",
+            "POST /api/mail/crm/campaigns/w/c/schedule {}",
+            'POST /api/mail/crm/campaigns/w/c/schedule {"sendAt":"2026-10-01T09:00:00.000Z"}',
+            "POST /api/mail/crm/campaigns/w/c/pause {}",
+            'POST /api/mail/crm/campaigns/w/audience {"listUids":["l"],"excludeListUids":[]}',
+            "GET /api/mail/crm/campaigns/w/c/report",
+            'POST /api/mail/crm/campaigns/w/c/recipients {"status":"sent","page":0}',
+        ]);
+    });
+
     it("uploads a CSV file as the raw body and reads the answer", async () => {
         const fetchMock = mockFetch(() => jsonResponse(200, { import: { uid: "i" }, targets: [], preview: [] }));
         const file = new File(["email\na@x.example"], "people list.csv", { type: "text/csv" });

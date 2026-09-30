@@ -4,6 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 import { MailboxSQL } from "@rapidmx/restapi/sql";
 import type { CrmModelClasses } from "../CrmModelClasses.js";
+import { CampaignSQL } from "./CampaignSQL.js";
 import { CrmCompanySQL } from "./CrmCompanySQL.js";
 import { CrmContactSQL } from "./CrmContactSQL.js";
 import { CrmFormSQL } from "./CrmFormSQL.js";
@@ -12,7 +13,9 @@ import { CrmNoteSQL } from "./CrmNoteSQL.js";
 import { CrmSettingSQL } from "./CrmSettingSQL.js";
 import { CrmTaskSQL } from "./CrmTaskSQL.js";
 import { EmailTemplateSQL } from "./EmailTemplateSQL.js";
+import { EngagementEventSQL } from "./EngagementEventSQL.js";
 import { MailingListSQL } from "./MailingListSQL.js";
+import { OutboundSendSQL } from "./OutboundSendSQL.js";
 import { PropertyDefinitionSQL } from "./PropertyDefinitionSQL.js";
 import { PropertyValueSQL } from "./PropertyValueSQL.js";
 import { SavedBlockSQL } from "./SavedBlockSQL.js";
@@ -43,5 +46,8 @@ export const SQL_MODELS: CrmModelClasses = {
     setting: CrmSettingSQL,
     template: EmailTemplateSQL,
     savedBlock: SavedBlockSQL,
+    campaign: CampaignSQL,
+    outboundSend: OutboundSendSQL,
+    engagementEvent: EngagementEventSQL,
     mailbox: MailboxSQL,
 };

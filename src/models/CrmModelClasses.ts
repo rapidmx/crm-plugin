@@ -27,6 +27,9 @@ export interface CrmModelClasses {
     setting: any;
     template: any;
     savedBlock: any;
+    campaign: any;
+    outboundSend: any;
+    engagementEvent: any;
     /** `@rapidmx/restapi`'s `Mailbox`. */
     mailbox: any;
 }

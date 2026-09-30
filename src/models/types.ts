@@ -243,6 +243,11 @@ export enum TimelineKind {
     SUBSCRIBED = "subscribed",
     UNSUBSCRIBED = "unsubscribed",
     FORM_SUBMITTED = "form_submitted",
+    EMAIL_OPENED = "email_opened",
+    EMAIL_CLICKED = "email_clicked",
+    EMAIL_REPLIED = "email_replied",
+    EMAIL_BOUNCED = "email_bounced",
+    EMAIL_COMPLAINED = "email_complained",
 }
 
 /** One entry of a contact's, company's or deal's activity timeline. Append-only. */
@@ -439,4 +444,196 @@ export interface SavedBlock extends CrmEntity {
     name: string;
     /** The saved blocks - see `templates/Design.ts`'s `DesignBlock`. */
     blocks: unknown[];
+}
+
+/** Where a campaign is. */
+export enum CampaignStatus {
+    /** Being written; can be changed. */
+    DRAFT = "draft",
+    /** Waiting for `scheduledAt`. */
+    SCHEDULED = "scheduled",
+    /** Its recipients are being worked out (`CampaignJob`). */
+    PREPARING = "preparing",
+    /** Its messages are going out (`SendDispatchJob`). */
+    SENDING = "sending",
+    /** Stopped by a member; resuming carries on where it stopped. */
+    PAUSED = "paused",
+    /** Every message has been sent or given up on. */
+    SENT = "sent",
+    /** Stopped for good; unsent messages were dropped. */
+    CANCELLED = "cancelled",
+    /** Couldn't be sent at all (`error` says why). */
+    FAILED = "failed",
+}
+
+/** What an A/B test's winner is picked by: the share of its recipients who opened, clicked or replied. */
+export enum AbMetric {
+    OPEN = "open",
+    CLICK = "click",
+    REPLY = "reply",
+}
+
+/** One version of a campaign in an A/B test: its own subject line, template, or both. */
+export interface CampaignVariant {
+    /** `A`, `B`, `C` or `D`. */
+    id: string;
+    /** The subject line, replacing the template's. */
+    subject?: string;
+    /** The template, replacing the campaign's. */
+    templateUid?: string;
+}
+
+/**
+ * An A/B test: `testPercent` of the audience is split evenly between the variants; after `testHours` the variant with the best
+ * `metric` is sent to everyone else.
+ */
+export interface AbTest {
+    variants: CampaignVariant[];
+    testPercent: number;
+    metric: AbMetric;
+    testHours: number;
+    /** The winning variant, once picked. */
+    winnerId?: string;
+    decidedAt?: Date;
+}
+
+/** A campaign's (or one variant's) numbers: recipients, and how many of them each thing happened to at least once. */
+export interface CampaignCounts {
+    recipients: number;
+    sent: number;
+    failed: number;
+    suppressed: number;
+    bounced: number;
+    opened: number;
+    clicked: number;
+    replied: number;
+    unsubscribed: number;
+    complained: number;
+}
+
+/** A campaign's numbers, overall and per A/B variant. */
+export interface CampaignStats extends CampaignCounts {
+    variants?: Record<string, CampaignCounts>;
+}
+
+/** A one-off email to the subscribers of some lists. */
+export interface Campaign extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    status: CampaignStatus;
+    templateUid?: string;
+    senderUid?: string;
+    /** The lists whose subscribers get it. */
+    listUids: string[];
+    /** Lists whose subscribers don't, even when on one of `listUids`. */
+    excludeListUids: string[];
+    /** Adds an invisible image that reports opens. */
+    trackOpens: boolean;
+    /** Sends links through a redirect that reports clicks. */
+    trackClicks: boolean;
+    abTest?: AbTest;
+    /** When it goes out (on `schedule`: now, if not given). */
+    scheduledAt?: Date;
+    startedAt?: Date;
+    finishedAt?: Date;
+    /** How far the audience has been worked out: the uid of the last subscription read. */
+    audienceCursor?: string;
+    audienceDone: boolean;
+    /** While `CampaignJob` prepares it on one replica. */
+    leaseExpiresAt?: Date;
+    recipientCount: number;
+    stats: CampaignStats;
+    statsAt?: Date;
+    error?: string;
+    createdByUserUid: string;
+}
+
+/** Where one outbound message is. */
+export enum SendStatus {
+    /** Waiting to go out. */
+    QUEUED = "queued",
+    /** Held back for an A/B test's winner. */
+    HELD = "held",
+    SENT = "sent",
+    /** The mail transport refused it for good, or retries ran out. */
+    FAILED = "failed",
+    /** Not sent: the address is suppressed, unsubscribed or bounced by the time its turn came. */
+    SUPPRESSED = "suppressed",
+    /** Not sent: its campaign was cancelled. */
+    CANCELLED = "cancelled",
+}
+
+/** What one outbound message was sent for. */
+export enum SendSource {
+    CAMPAIGN = "campaign",
+    AUTOMATION = "automation",
+}
+
+/**
+ * One marketing message to one contact, and what came of it. Its `token` names it in tracking links, in its `Message-ID` and in
+ * its bounce address. Unique by `dedupeKey`, so a campaign (or an automation step) never mails a contact twice.
+ */
+export interface OutboundSend extends CrmEntity {
+    workspaceUid: string;
+    sourceType: SendSource;
+    /** The campaign (or automation) it was sent for. */
+    sourceUid: string;
+    /** `campaign:<campaignUid>:<contactUid>`, `automation:<enrollmentUid>:<nodeId>`... */
+    dedupeKey: string;
+    contactUid: string;
+    /** The address, as it was when the message was queued. */
+    email: string;
+    /** The A/B variant (`A` without a test; empty while held for a winner). */
+    variantId: string;
+    status: SendStatus;
+    /** Random and unguessable. */
+    token: string;
+    /** The `Message-ID` header (without angle brackets), once sent. */
+    messageId?: string;
+    attempts: number;
+    /** When it may be tried next. */
+    nextAttemptAt: Date;
+    /** While one replica is sending it. */
+    leaseExpiresAt?: Date;
+    sentAt?: Date;
+    error?: string;
+    firstOpenedAt?: Date;
+    lastOpenedAt?: Date;
+    openCount: number;
+    /** Every open so far looked automatic (a mail server or privacy proxy fetching images). */
+    machineOpen: boolean;
+    firstClickedAt?: Date;
+    clickCount: number;
+    repliedAt?: Date;
+    bouncedAt?: Date;
+    /** `hard` or `soft`. */
+    bounceType?: string;
+    complainedAt?: Date;
+    unsubscribedAt?: Date;
+}
+
+/** What an engagement event records. */
+export enum EngagementType {
+    SENT = "sent",
+    FAILED = "failed",
+    OPENED = "opened",
+    CLICKED = "clicked",
+    REPLIED = "replied",
+    BOUNCED = "bounced",
+    COMPLAINED = "complained",
+    UNSUBSCRIBED = "unsubscribed",
+}
+
+/** One thing that happened to an outbound message. Append-only. */
+export interface EngagementEvent extends CrmEntity {
+    workspaceUid: string;
+    sendUid: string;
+    sourceType: SendSource;
+    sourceUid: string;
+    contactUid: string;
+    variantId: string;
+    type: EngagementType;
+    occurredAt: Date;
+    /** Type-specific details: a click's `url` and `index`, an open's `machine`, a bounce's `status` and `bounceType`. */
+    data: Record<string, unknown>;
 }

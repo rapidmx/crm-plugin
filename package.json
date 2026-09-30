@@ -161,6 +161,20 @@
                     "type": "number",
                     "default": 10,
                     "help": "How many workspaces one user may create."
+                },
+                {
+                    "key": "mail:crm:send_rate_per_minute",
+                    "label": "Campaign messages per minute",
+                    "type": "number",
+                    "default": 600,
+                    "help": "The most campaign messages the whole deployment sends per minute, shared by every workspace. Raise it only as far as your mail server and its reputation allow."
+                },
+                {
+                    "key": "mail:crm:verp",
+                    "label": "Per-message bounce addresses",
+                    "type": "boolean",
+                    "default": true,
+                    "help": "Send each campaign message with its own bounce address (the sender's address plus a +b- tag), so bounces are matched to their message reliably. Needs plus-addressing, which RapidMX has on by default."
                 }
             ],
             "ui": {
