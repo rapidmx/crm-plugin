@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.0
+
 ### Added
 
 - **Email marketing:** a drag-and-drop template designer, campaigns with scheduling, A/B tests, open, click, reply and bounce tracking, one-click unsubscribe, and suppression of bounced and complaining addresses.
