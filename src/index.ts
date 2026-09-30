@@ -5,7 +5,9 @@
 /**
  * A customer relationship management platform for a `@rapidmx/restapi`-based mail server: shared workspaces of contacts and
  * companies with custom properties, tags, notes, tasks, an activity timeline, filtered search and CSV import and export; mailing
- * lists, subscriptions with double opt-in, suppressions, signup forms and a subscriber preference center.
+ * lists, subscriptions with double opt-in, suppressions, signup forms and a subscriber preference center; a template designer,
+ * campaigns with tracking and A/B tests, segments, lead scoring, automations, sales pipelines, reports, webhooks and an integration
+ * API.
  *
  * This module exports only the backend-agnostic surface: the entity interfaces, the filter engine, the utilities and the abstract
  * routes and jobs. The concrete Mongo/SQL classes a server loads come from this package's `./mongo` and `./sql` entry points.
@@ -47,6 +49,11 @@ export * from "./routes/BaseScoringRuleRoute.js";
 export * from "./routes/BaseAutomationRoute.js";
 export * from "./routes/BasePipelineRoute.js";
 export * from "./routes/BaseDealRoute.js";
+export * from "./routes/BaseAnalyticsRoute.js";
+export * from "./routes/BaseWebhookRoute.js";
+export * from "./routes/BaseApiKeyRoute.js";
+export * from "./routes/BaseIntegrationRoute.js";
+export * from "./routes/BaseCrmAdminRoute.js";
 export * from "./automation/Events.js";
 export * from "./automation/Graph.js";
 export * from "./automation/Engine.js";
@@ -71,3 +78,6 @@ export * from "./jobs/ScoringJob.js";
 export * from "./jobs/AutomationTriggerJob.js";
 export * from "./jobs/AutomationRunJob.js";
 export * from "./jobs/TaskReminderJob.js";
+export * from "./jobs/WebhookDeliveryJob.js";
+export * from "./webhooks/Webhooks.js";
+export * from "./webhooks/Deliveries.js";

@@ -16,12 +16,16 @@ import {
     SendStatus,
     Subscription,
     SubscriptionStatus,
+    Workspace,
 } from "../models/types.js";
 import { suppressedAmong } from "../sending/Audience.js";
 import { CampaignMessage, CampaignRenderer, UnrenderableError } from "../sending/CampaignRenderer.js";
 import { EngagementRecorder } from "../sending/Engagement.js";
 import { CrmJobBase } from "./CrmJobBase.js";
 const { Config, Inject } = ObjectDecorators;
+
+/** How long a stopped workspace's messages wait before they are looked at again. */
+export const STOPPED_RETRY_MS = 15 * 60_000;
 
 /** The shared counter every replica's sends are counted against (`RateLimiter`, in Redis when there is one). */
 const RATE_KEY = "crm-send|all";
@@ -35,7 +39,8 @@ const RATE_KEY = "crm-send|all";
  * - **One replica per message**: a message is claimed with a version-checked update that leases it; a replica that dies mid-send
  * leaves the lease to run out, and the message is sent again (at least once).
  * - **Last-moment checks**: a message whose contact has gone, unsubscribed from the campaign's lists or all email, bounced or was
- * suppressed since is `suppressed`, not sent. A paused campaign's messages wait; a cancelled one's are dropped.
+ * suppressed since is `suppressed`, not sent. A paused campaign's messages wait; a cancelled one's are dropped. A workspace whose
+ * sending an administrator stopped (`Workspace.sendingDisabled`) keeps its messages queued, looked at again every `STOPPED_RETRY_MS`.
  * - **Failures**: a temporary refusal is retried with backoff (up to `max_attempts`); a permanent one fails the message, and a
  * refusal of the address itself (a `5.1.x` status) counts as a hard bounce - suppressing it.
  */
@@ -93,8 +98,18 @@ export abstract class SendDispatchJob extends CrmJobBase {
             verp: this.verp,
         });
         const sources: Map<string, Promise<any>> = new Map();
+        const stopped: Map<string, Promise<boolean>> = new Map();
         for (const candidate of due) {
             try {
+                let workspaceStopped: Promise<boolean> | undefined = stopped.get(candidate.workspaceUid);
+                if (!workspaceStopped) {
+                    workspaceStopped = this.sendingStopped(candidate.workspaceUid);
+                    stopped.set(candidate.workspaceUid, workspaceStopped);
+                }
+                if (await workspaceStopped) {
+                    await this.finish(candidate, { nextAttemptAt: new Date(Date.now() + STOPPED_RETRY_MS) });
+                    continue;
+                }
                 if (!(await this.dispatch(candidate, renderer, sources))) {
                     return;
                 }
@@ -102,6 +117,12 @@ export abstract class SendDispatchJob extends CrmJobBase {
                 this.logger?.error(`SendDispatchJob: send ${candidate.uid} failed: ${err?.message ?? err}`);
             }
         }
+    }
+
+    /** Whether an administrator stopped the workspace's sending. */
+    private async sendingStopped(workspaceUid: string): Promise<boolean> {
+        const workspace: Workspace | undefined = await (await this.repo<Workspace>("workspace")).findOne(workspaceUid, { ignoreACL: true, skipCache: true });
+        return !!workspace?.sendingDisabled;
     }
 
     /** Sends one message if it may go. `false` stops the run (the rate cap was reached). */

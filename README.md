@@ -61,10 +61,12 @@ This first release covers the CRM core:
 
 - **Automations**: workflows that react to what contacts do.
   - **Triggers:** subscribing or unsubscribing, submitting a form, entering or leaving a segment, being created or changed,
-    opening, clicking, replying to or bouncing an email, or being put in by hand. A trigger can also take a contact filter.
+    opening, clicking, replying to or bouncing an email, a deal being created, moved, won or lost, an event your own systems
+    report through the integration API (optionally by name), or being put in by hand. A trigger can also take a contact filter.
   - **Steps:** waiting a while; waiting for an earlier email to be opened, clicked or replied to (with a timeout, and a branch
     for each outcome); if/else on a contact filter; random splits; sending an email; setting a field; adding or removing a tag;
-    subscribing or unsubscribing; creating a task; notifying a member; putting the contact into another automation; ending.
+    subscribing or unsubscribing; creating a task; notifying a member; putting the contact into another automation; posting to
+    a webhook; ending.
   - **Editing:** a branching editor with ready-made starting points ("welcome, then follow up if there's no reply", welcome
     series, form follow-up, win back). A publish checks the whole flow first.
   - **Running:** contacts go through the version they entered. A goal takes them out early, and a re-entry rule decides whether
@@ -80,6 +82,19 @@ This first release covers the CRM core:
     won, lost or moved can start automations.
 - **Task reminders** notify the assignee when a task comes due.
 - **1:1 email logging** (per sender, opt-in): mail the sender's mailbox exchanges with contacts goes on their timelines.
+- **Reports** over the last 7, 30, 90 or 365 days:
+  - email sent, opened, clicked, replied to, bounced and unsubscribed from, per day and as rates, with the top recipient domains;
+  - new contacts, subscribes and unsubscribes per day, and each list's subscribers;
+  - deals won (and their value), lost and open, and the win rate, for all pipelines or one.
+
+  Charts have a hover card, arrow-key navigation and a table view.
+- **Webhooks**: what happens in a workspace (contacts created or changed, subscriptions, forms, segments, email engagement, deals,
+  custom events, automation steps) posted as signed JSON to `https://` addresses on the public internet. Failed posts are retried
+  with backoff; an endpoint that keeps failing is switched off. Each endpoint shows its recent deliveries and can be pinged.
+- **An integration API** for a workspace's own systems, with **API keys** scoped to adding contacts, changing subscriptions or
+  reporting events.
+- **A CRM page in the admin console** (`/admin/crm`): every workspace with its size, the deployment's sending numbers, and a switch
+  that stops a workspace's campaign and automation email (for abuse) without touching its data.
 
 ## Installing
 
@@ -113,6 +128,7 @@ Replies, bounces and complaints are learned from restapi's mail event stream, so
 | `mail:crm:jobs:triggers:schedule`, `...:batch`, `...:retention_days` | `*/5 * * * * *`, `200`, `30` | How contact events are handed to automations, and how long they are kept. |
 | `mail:crm:jobs:reminders:schedule`, `...:lead_minutes` | `15 * * * * *`, `15` | How task reminders are sent, and how long before a task is due. |
 | `mail:crm:jobs:automations:schedule`, `...:batch`, `...:lease_seconds`, `...:paused_retry_seconds` | `*/5 * * * * *`, `100`, `120`, `60` | How contacts are moved through automations. |
+| `mail:crm:jobs:webhooks:schedule`, `...:max_attempts`, `...:retention_days` | `*/5 * * * * *`, `8`, `14` | How webhooks are posted and retried, and how long deliveries are kept. |
 
 ## API
 
@@ -137,6 +153,11 @@ A deployment administrator has no access to a workspace they aren't a member of.
 | `automations` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/:uid/publish\|pause\|resume`, `POST /:workspaceUid/:uid/enroll` (`{ contactUids }`), `GET /:workspaceUid/:uid/report`, `POST /:workspaceUid/:uid/enrollments`, `POST /:workspaceUid/:uid/enrollments/:enrollmentUid/exit` |
 | `pipelines` | `GET /:workspaceUid` (makes a default pipeline if there is none), `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` (admins) |
 | `deals` | `GET /:workspaceUid?pipelineUid=&stageId=&status=&ownerUserUid=&companyUid=&contactUid=`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `GET /:workspaceUid/forecast?pipelineUid=&days=` |
+| `analytics` | `GET /:workspaceUid/email?days=`, `GET /:workspaceUid/growth?days=`, `GET /:workspaceUid/sales?days=&pipelineUid=` (`days` 1-365, 30 by default; UTC days) |
+| `webhooks` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` (admins; answers the `secret` once), `POST /:workspaceUid/:uid/secret` (a new secret), `POST /:workspaceUid/:uid/test` (a `ping`), `GET /:workspaceUid/:uid/deliveries` |
+| `api-keys` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` (admins; answers the `key` once) |
+| `integrations` (API key) | `POST /:workspaceUid/contacts`, `POST /:workspaceUid/subscribe`, `POST /:workspaceUid/unsubscribe`, `POST /:workspaceUid/events`, `GET /:workspaceUid/lists` |
+| `admin` (deployment administrators) | `GET /stats`, `GET /workspaces?limit=&page=`, `PUT /workspaces/:workspaceUid` (`{ sendingDisabled }`) |
 | `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `GET/POST /unsubscribe/:token` |
 | `t` (anonymous) | `GET /o/:token` (open image), `GET /c/:token/:index?u=&s=` (tracked link) |
 
@@ -152,6 +173,27 @@ A template's `design` is `{ theme, sections: [{ columns: [{ blocks: [...] }] }] 
 - A design that can't be laid out, or that has a broken merge tag, is refused.
 
 `POST /render` returns `{ subject, html, text }`. A test is sent only to the address of a mailbox the caller can read.
+
+### Webhooks
+
+Each delivery is a `POST` of JSON: `{ id, type, occurredAt, workspaceUid, contact?: { uid, email, firstName, lastName }, data }`.
+`type` is the event (`contact.created`, `deal.won`, `custom`, `automation.webhook`, `ping`...). The `X-RapidMX-Signature` header is
+`t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<body>" keyed with the endpoint's secret>`; check it, and refuse old timestamps.
+A 2xx answer counts as delivered. Anything else is retried 1, 2, 4... minutes later, up to 8 times; after 20 failures in a row the
+endpoint is switched off. Redirects aren't followed, and the address is resolved and checked for a public IP at every post.
+
+### Integration API
+
+Call `/api/mail/crm/integrations/<workspaceUid>/...` with `Authorization: Bearer crm_...`. A missing, unknown or revoked key is a
+401; a key without the endpoint's scope a 403. Each key may make 600 calls a minute.
+
+| Endpoint | Scope | Body | Answer |
+| --- | --- | --- | --- |
+| `POST /contacts` | `contacts` | `{ email, firstName?, lastName?, phone?, tags?, properties?, ... }` | `{ outcome: "created" \| "updated", uid }` |
+| `POST /subscribe` | `subscriptions` | `{ email, listUid, ...contact fields }` | `{ contactUid, status }` |
+| `POST /unsubscribe` | `subscriptions` | `{ email, listUid? }` - without a list, from every list and all email | `{ contactUid? }` |
+| `POST /events` | `events` | `{ email, name, data? }` - starts automations whose trigger is a custom event (of that name) | `{ contactUid }` |
+| `GET /lists` | any | | `[{ uid, name, publicName }]` |
 
 ## Development
 

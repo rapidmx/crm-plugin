@@ -60,3 +60,8 @@ export async function assertWorkspaceAccess(
 export function notFound(): ApiError {
     return new ApiError(ApiErrors.NOT_FOUND, 404, ApiErrorMessages.NOT_FOUND);
 }
+
+/** A 403 `ApiError`. */
+export function forbidden(): ApiError {
+    return new ApiError(ApiErrors.AUTH_PERMISSION_FAILURE, 403, ApiErrorMessages.AUTH_PERMISSION_FAILURE);
+}

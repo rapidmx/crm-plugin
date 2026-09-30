@@ -4,6 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 import { MailboxSQL } from "@rapidmx/restapi/sql";
 import type { CrmModelClasses } from "../CrmModelClasses.js";
+import { ApiKeySQL } from "./ApiKeySQL.js";
 import { AutomationSQL } from "./AutomationSQL.js";
 import { AutomationVersionSQL } from "./AutomationVersionSQL.js";
 import { CampaignSQL } from "./CampaignSQL.js";
@@ -30,6 +31,8 @@ import { SegmentSQL } from "./SegmentSQL.js";
 import { SubscriptionSQL } from "./SubscriptionSQL.js";
 import { SuppressionSQL } from "./SuppressionSQL.js";
 import { TimelineEventSQL } from "./TimelineEventSQL.js";
+import { WebhookDeliverySQL } from "./WebhookDeliverySQL.js";
+import { WebhookEndpointSQL } from "./WebhookEndpointSQL.js";
 import { WorkspaceSQL } from "./WorkspaceSQL.js";
 import { WorkspaceMemberSQL } from "./WorkspaceMemberSQL.js";
 import { WorkspaceSenderSQL } from "./WorkspaceSenderSQL.js";
@@ -65,5 +68,8 @@ export const SQL_MODELS: CrmModelClasses = {
     crmEvent: CrmEventSQL,
     pipeline: PipelineSQL,
     deal: DealSQL,
+    webhookEndpoint: WebhookEndpointSQL,
+    webhookDelivery: WebhookDeliverySQL,
+    apiKey: ApiKeySQL,
     mailbox: MailboxSQL,
 };

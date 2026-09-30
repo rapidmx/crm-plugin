@@ -118,7 +118,7 @@ export abstract class BaseAutomationRoute extends BaseWorkspaceRecordRoute<Autom
     /** Refuses (400) a published graph naming something the workspace doesn't have. */
     private async checkReferences(automation: Automation, references: GraphReferences): Promise<void> {
         const workspaceUid: string = automation.workspaceUid;
-        const exists = async (name: "template" | "workspaceSender" | "form" | "segment" | "automation" | "pipeline", uid: string): Promise<boolean> => {
+        const exists = async (name: "template" | "workspaceSender" | "form" | "segment" | "automation" | "pipeline" | "webhookEndpoint", uid: string): Promise<boolean> => {
             const record: { workspaceUid: string } | undefined = await (await this.repo(name)).findOne(uid, { ignoreACL: true, skipCache: true });
             return record?.workspaceUid === workspaceUid;
         };
@@ -131,6 +131,7 @@ export abstract class BaseAutomationRoute extends BaseWorkspaceRecordRoute<Autom
             [references.automations, async (uid) => uid !== automation.uid && (await exists("automation", uid)), "another automation"],
             [references.members, async (uid) => !!(await this.findMember(workspaceUid, uid)), "a member of the workspace"],
             [references.pipelines, (uid) => exists("pipeline", uid), "a pipeline"],
+            [references.webhooks, (uid) => exists("webhookEndpoint", uid), "a webhook"],
         ];
         for (const [uids, check, noun] of checks) {
             for (const uid of uids) {

@@ -91,6 +91,8 @@ export function stubBasics(api: any, overrides: { workspaces?: any[] } = {}): vo
     api.listEnrollments.mockResolvedValue({ items: [], total: 0 });
     api.listPipelines.mockResolvedValue([pipeline()]);
     api.listDeals.mockResolvedValue([]);
+    api.listWebhooks.mockResolvedValue([]);
+    api.listApiKeys.mockResolvedValue([]);
     api.dealForecast.mockResolvedValue({ stages: [], open: { count: 0, amount: 0, weighted: 0 }, won: { count: 0, amount: 0 }, lost: { count: 0, amount: 0 } });
 }
 

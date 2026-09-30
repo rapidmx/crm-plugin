@@ -23,6 +23,8 @@ export enum CrmEventType {
     DEAL_STAGE_CHANGED = "deal.stage_changed",
     DEAL_WON = "deal.won",
     DEAL_LOST = "deal.lost",
+    /** Something the workspace's own systems reported through the integration API (`data.name` says what). */
+    CUSTOM = "custom",
     /** A member put the contact in (`POST /automations/:ws/:uid/enroll`, or another automation's `enroll` step). */
     MANUAL = "manual",
 }

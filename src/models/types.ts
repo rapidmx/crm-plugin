@@ -54,6 +54,8 @@ export interface Workspace extends CrmEntity {
     scoringDirty: boolean;
     /** When contacts were last scored. */
     scoredAt?: Date;
+    /** A deployment administrator stopped the workspace's campaign and automation email (abuse). */
+    sendingDisabled: boolean;
 }
 
 /** A user's membership of a workspace. Unique per workspace and user. */
@@ -906,5 +908,70 @@ export interface Deal extends CrmEntity {
     /** When it entered its stage. */
     stageChangedAt: Date;
     stageHistory: DealStageChange[];
+    createdByUserUid: string;
+}
+
+/** Where a workspace's events are posted, signed with `secret`. */
+export interface WebhookEndpoint extends CrmEntity {
+    workspaceUid: string;
+    /** An `https://` address on the public internet. */
+    url: string;
+    /** The event types sent (`contact.created`, `deal.won`...); `*` for all. */
+    events: string[];
+    /** The key the `X-RapidMX-Signature` header is made with. */
+    secret: string;
+    enabled: boolean;
+    description?: string;
+    /** Failed deliveries in a row; the endpoint is switched off at `MAX_ENDPOINT_FAILURES`. */
+    failureCount: number;
+    lastDeliveryAt?: Date;
+    lastError?: string;
+    createdByUserUid: string;
+}
+
+/** Where a webhook delivery is. */
+export enum WebhookDeliveryStatus {
+    PENDING = "pending",
+    DELIVERED = "delivered",
+    FAILED = "failed",
+}
+
+/** One event to post to one endpoint. */
+export interface WebhookDelivery extends CrmEntity {
+    workspaceUid: string;
+    endpointUid: string;
+    eventType: string;
+    /** The JSON body. */
+    payload: Record<string, unknown>;
+    status: WebhookDeliveryStatus;
+    attempts: number;
+    nextAttemptAt: Date;
+    leaseExpiresAt?: Date;
+    responseStatus?: number;
+    lastError?: string;
+    deliveredAt?: Date;
+}
+
+/** What an API key may do. */
+export enum ApiKeyScope {
+    /** Create and update contacts. */
+    CONTACTS = "contacts",
+    /** Subscribe and unsubscribe contacts. */
+    SUBSCRIPTIONS = "subscriptions",
+    /** Record custom events for automations. */
+    EVENTS = "events",
+}
+
+/** A key a workspace's own systems call the integration API with. Only its hash is kept. */
+export interface ApiKey extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    /** The key's first characters, to tell keys apart. */
+    prefix: string;
+    /** SHA-256 of the key, hex. */
+    hash: string;
+    scopes: ApiKeyScope[];
+    lastUsedAt?: Date;
+    revokedAt?: Date;
     createdByUserUid: string;
 }

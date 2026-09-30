@@ -21,6 +21,7 @@ export enum NodeType {
     CREATE_TASK = "create_task",
     NOTIFY = "notify",
     ENROLL = "enroll",
+    WEBHOOK = "webhook",
     EXIT = "exit",
 }
 
@@ -71,6 +72,7 @@ export const PORTS: Readonly<Record<NodeType, readonly string[]>> = {
     [NodeType.CREATE_TASK]: ["next"],
     [NodeType.NOTIFY]: ["next"],
     [NodeType.ENROLL]: ["next"],
+    [NodeType.WEBHOOK]: ["next"],
     [NodeType.EXIT]: [],
 };
 
@@ -138,6 +140,7 @@ export interface GraphReferences {
     automations: Set<string>;
     members: Set<string>;
     pipelines: Set<string>;
+    webhooks: Set<string>;
     /** Contact filters (triggers, conditions), to validate against the workspace's fields. */
     filters: unknown[];
 }
@@ -196,7 +199,7 @@ export function validateForPublish(graph: AutomationGraph): GraphReferences {
     }
     checkLoops(graph);
 
-    const references: GraphReferences = { templates: new Set(), senders: new Set(), lists: new Set(), forms: new Set(), segments: new Set(), automations: new Set(), members: new Set(), pipelines: new Set(), filters: [] };
+    const references: GraphReferences = { templates: new Set(), senders: new Set(), lists: new Set(), forms: new Set(), segments: new Set(), automations: new Set(), members: new Set(), pipelines: new Set(), webhooks: new Set(), filters: [] };
     for (const node of graph.nodes) {
         const where: string = `Step ${node.id}`;
         const config: Record<string, unknown> = node.config;
@@ -284,6 +287,9 @@ export function validateForPublish(graph: AutomationGraph): GraphReferences {
                 break;
             case NodeType.ENROLL:
                 references.automations.add(text(config, "automationUid", where, 64));
+                break;
+            case NodeType.WEBHOOK:
+                references.webhooks.add(text(config, "endpointUid", where, 64));
                 break;
             default:
                 // EXIT has nothing to set.

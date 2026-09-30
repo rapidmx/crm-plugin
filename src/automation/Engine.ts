@@ -25,11 +25,13 @@ import {
     TaskPriority,
     TaskStatus,
     TimelineKind,
+    WebhookEndpoint,
 } from "../models/types.js";
 import type { BaseContactRoute } from "../routes/BaseContactRoute.js";
 import { contactFilterFields } from "../segments/Segments.js";
 import { newSendToken } from "../sending/Tracking.js";
 import { filterValues, readValues } from "../util/PropertyValues.js";
+import { enqueueDeliveries, payloadId } from "../webhooks/Deliveries.js";
 import { CrmEventType } from "./Events.js";
 import { AutomationGraph, AutomationNode, NodeType, TIME_UNITS, nextNode } from "./Graph.js";
 
@@ -57,6 +59,9 @@ export function triggerMatches(trigger: AutomationNode, event: Pick<CrmEvent, "t
         if (config[field] && config[field] !== event.data[field]) {
             return false;
         }
+    }
+    if (config.name && config.name !== event.data.name) {
+        return false;
     }
     if (Array.isArray(config.fields) && config.fields.length > 0) {
         const changed: unknown[] = Array.isArray(event.data.fields) ? event.data.fields : [];
@@ -352,6 +357,22 @@ export class AutomationEngine {
                     : undefined;
                 const entered: Enrollment | undefined = target && version ? await this.enroll(target, version, contactUid, `from "${automation.name}"`) : undefined;
                 return { port: "next", outcome: entered ? "enrolled" : "not enrolled" };
+            }
+            case NodeType.WEBHOOK: {
+                const endpoint: WebhookEndpoint | undefined = await (await this.repo<WebhookEndpoint>("webhookEndpoint")).findOne(String(config.endpointUid), { ignoreACL: true });
+                if (!endpoint?.enabled) {
+                    return { port: "next", outcome: "webhook off" };
+                }
+                const contact: CrmContact = await this.contact(contactUid);
+                await enqueueDeliveries(this.context.repos, this.context.classes, [endpoint], {
+                    id: payloadId(),
+                    type: "automation.webhook",
+                    occurredAt: new Date().toISOString(),
+                    workspaceUid: automation.workspaceUid,
+                    contact: { uid: contact.uid, email: contact.email, firstName: contact.firstName ?? undefined, lastName: contact.lastName ?? undefined },
+                    data: { automationUid: automation.uid, automationName: automation.name, nodeId: node.id },
+                });
+                return { port: "next", outcome: "webhook queued" };
             }
             case NodeType.EXIT:
                 return { finish: EnrollmentState.COMPLETED, outcome: "exit" };

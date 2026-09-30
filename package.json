@@ -138,7 +138,7 @@
         "plugin": {
             "apiVersion": 1,
             "displayName": "CRM",
-            "description": "Adds a customer relationship management app at /crm: shared workspaces of contacts and companies with custom properties, notes, tasks and an activity timeline, mailing lists with signup forms, double opt-in and a subscriber preference center, and CSV import and export.",
+            "description": "Adds a customer relationship management app at /crm: shared workspaces of contacts, companies and deals with custom properties, notes, tasks and an activity timeline; mailing lists with signup forms, double opt-in and a subscriber preference center; an email designer, campaigns with tracking and A/B tests, segments, lead scoring and automations; sales pipelines; reports; webhooks and an integration API - and a CRM page in the admin console.",
             "mailboxScopedData": true,
             "settings": [
                 {
@@ -196,6 +196,12 @@
                         "host": "public",
                         "mount": "/f",
                         "dir": "apps/f"
+                    },
+                    {
+                        "id": "crm-admin",
+                        "host": "admin",
+                        "mount": "/admin/crm",
+                        "dir": "apps/admin-crm"
                     }
                 ],
                 "appRail": [
@@ -203,6 +209,14 @@
                         "id": "crm",
                         "label": "CRM",
                         "href": "/crm",
+                        "icon": "HiOutlineUserGroup"
+                    }
+                ],
+                "adminNav": [
+                    {
+                        "id": "crm",
+                        "label": "CRM",
+                        "href": "/admin/crm",
                         "icon": "HiOutlineUserGroup"
                     }
                 ]

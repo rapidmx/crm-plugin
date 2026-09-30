@@ -31,3 +31,6 @@ export { EnrollmentMongo } from "../../../src/models/mongo/EnrollmentMongo.js";
 export { CrmEventMongo } from "../../../src/models/mongo/CrmEventMongo.js";
 export { PipelineMongo } from "../../../src/models/mongo/PipelineMongo.js";
 export { DealMongo } from "../../../src/models/mongo/DealMongo.js";
+export { WebhookEndpointMongo } from "../../../src/models/mongo/WebhookEndpointMongo.js";
+export { WebhookDeliveryMongo } from "../../../src/models/mongo/WebhookDeliveryMongo.js";
+export { ApiKeyMongo } from "../../../src/models/mongo/ApiKeyMongo.js";

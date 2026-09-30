@@ -746,6 +746,7 @@ export type NodeType =
     | "create_task"
     | "notify"
     | "enroll"
+    | "webhook"
     | "exit";
 
 export interface AutomationNode {
@@ -897,3 +898,149 @@ export const updateDeal = (workspaceUid: string, uid: string, input: DealInput):
 export const deleteDeal = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/deals/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
 export const dealForecast = (workspaceUid: string, pipelineUid: string, days: number = 90): Promise<Forecast> =>
     apiFetch(`/mail/crm/deals/${enc(workspaceUid)}/forecast?pipelineUid=${enc(pipelineUid)}&days=${days}`);
+
+// Reports
+
+export interface EmailDay {
+    date: string;
+    sent: number;
+    opened: number;
+    clicked: number;
+    replied: number;
+    bounced: number;
+    unsubscribed: number;
+}
+
+export interface EmailReport {
+    days: EmailDay[];
+    totals: { sent: number; opened: number; clicked: number; replied: number; bounced: number; unsubscribed: number; complained: number };
+    domains: { domain: string; sent: number; opened: number; clicked: number }[];
+}
+
+export interface GrowthReport {
+    days: { date: string; contacts: number; subscribed: number; unsubscribed: number }[];
+    contacts: number;
+    lists: { uid: string; name: string; subscribed: number }[];
+}
+
+export interface SalesReport {
+    days: { date: string; created: number; won: number; wonAmount: number; lost: number }[];
+    open: { count: number; amount: number };
+    won: { count: number; amount: number };
+    lost: number;
+}
+
+export const emailReport = (workspaceUid: string, days: number): Promise<EmailReport> => apiFetch(`/mail/crm/analytics/${enc(workspaceUid)}/email?days=${days}`);
+export const growthReport = (workspaceUid: string, days: number): Promise<GrowthReport> => apiFetch(`/mail/crm/analytics/${enc(workspaceUid)}/growth?days=${days}`);
+export const salesReport = (workspaceUid: string, days: number, pipelineUid?: string): Promise<SalesReport> =>
+    apiFetch(`/mail/crm/analytics/${enc(workspaceUid)}/sales?days=${days}${pipelineUid ? `&pipelineUid=${enc(pipelineUid)}` : ""}`);
+
+// Webhooks and API keys
+
+export interface WebhookEndpoint extends Stored {
+    workspaceUid: string;
+    url: string;
+    events: string[];
+    enabled: boolean;
+    description?: string | null;
+    failureCount: number;
+    lastDeliveryAt?: string;
+    lastError?: string | null;
+    secretHint: string;
+    /** Only when it was just made. */
+    secret?: string;
+}
+
+export type WebhookDeliveryStatus = "pending" | "delivered" | "failed";
+
+export interface WebhookDelivery extends Stored {
+    endpointUid: string;
+    eventType: string;
+    status: WebhookDeliveryStatus;
+    attempts: number;
+    responseStatus?: number;
+    lastError?: string | null;
+    deliveredAt?: string;
+}
+
+/** The event types an endpoint can take (besides `*`, all of them). */
+export const WEBHOOK_EVENTS: readonly string[] = [
+    "contact.created",
+    "contact.updated",
+    "list.subscribed",
+    "list.unsubscribed",
+    "form.submitted",
+    "segment.entered",
+    "segment.left",
+    "email.sent",
+    "email.opened",
+    "email.clicked",
+    "email.replied",
+    "email.bounced",
+    "email.unsubscribed",
+    "deal.created",
+    "deal.stage_changed",
+    "deal.won",
+    "deal.lost",
+    "custom",
+    "automation.webhook",
+];
+
+export type WebhookInput = { url?: string; events?: string[]; enabled?: boolean; description?: string | null };
+
+export const listWebhooks = (workspaceUid: string): Promise<WebhookEndpoint[]> => apiFetch(`/mail/crm/webhooks/${enc(workspaceUid)}?limit=50`);
+export const createWebhook = (workspaceUid: string, input: WebhookInput): Promise<WebhookEndpoint> => apiFetch(`/mail/crm/webhooks/${enc(workspaceUid)}`, json("POST", input));
+export const updateWebhook = (workspaceUid: string, uid: string, input: WebhookInput): Promise<WebhookEndpoint> =>
+    apiFetch(`/mail/crm/webhooks/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteWebhook = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/webhooks/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+export const rotateWebhookSecret = (workspaceUid: string, uid: string): Promise<{ secret: string }> =>
+    apiFetch(`/mail/crm/webhooks/${enc(workspaceUid)}/${enc(uid)}/secret`, json("POST"));
+export const testWebhook = (workspaceUid: string, uid: string): Promise<{ status?: number; error?: string }> =>
+    apiFetch(`/mail/crm/webhooks/${enc(workspaceUid)}/${enc(uid)}/test`, json("POST"));
+export const webhookDeliveries = (workspaceUid: string, uid: string): Promise<WebhookDelivery[]> => apiFetch(`/mail/crm/webhooks/${enc(workspaceUid)}/${enc(uid)}/deliveries`);
+
+export type ApiKeyScope = "contacts" | "subscriptions" | "events";
+export const API_KEY_SCOPES: readonly ApiKeyScope[] = ["contacts", "subscriptions", "events"];
+
+export interface ApiKey extends Stored {
+    workspaceUid: string;
+    name: string;
+    prefix: string;
+    scopes: ApiKeyScope[];
+    lastUsedAt?: string;
+    createdByUserUid: string;
+    /** Only when it was just made. */
+    key?: string;
+}
+
+export const listApiKeys = (workspaceUid: string): Promise<ApiKey[]> => apiFetch(`/mail/crm/api-keys/${enc(workspaceUid)}?limit=50`);
+export const createApiKey = (workspaceUid: string, input: { name: string; scopes: ApiKeyScope[] }): Promise<ApiKey> =>
+    apiFetch(`/mail/crm/api-keys/${enc(workspaceUid)}`, json("POST", input));
+export const updateApiKey = (workspaceUid: string, uid: string, input: { name?: string; scopes?: ApiKeyScope[] }): Promise<ApiKey> =>
+    apiFetch(`/mail/crm/api-keys/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteApiKey = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/api-keys/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+
+// Deployment administration
+
+export interface AdminWorkspace {
+    uid: string;
+    name: string;
+    dateCreated: string;
+    members: number;
+    contacts: number;
+    campaignsSent: number;
+    sendingDisabled: boolean;
+}
+
+export interface AdminStats {
+    workspaces: number;
+    contacts: number;
+    sentLastDay: number;
+    queued: number;
+}
+
+export const adminStats = (): Promise<AdminStats> => apiFetch("/mail/crm/admin/stats");
+export const adminWorkspaces = (page: number, limit: number = 50): Promise<{ items: AdminWorkspace[]; total: number }> =>
+    apiFetch(`/mail/crm/admin/workspaces?limit=${limit}&page=${page}`);
+export const setWorkspaceSending = (uid: string, sendingDisabled: boolean): Promise<{ uid: string; sendingDisabled: boolean }> =>
+    apiFetch(`/mail/crm/admin/workspaces/${enc(uid)}`, json("PUT", { sendingDisabled }));

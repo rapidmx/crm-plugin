@@ -321,6 +321,48 @@ describe("crmApi", () => {
         await expect(api.exportRecords("company", "w", {})).rejects.toBeInstanceOf(ApiRequestError);
     });
 
+    it("calls each report, webhook, API key and administration endpoint", async () => {
+        const calls = recordCalls(() => jsonResponse(200, {}));
+        await api.emailReport("w", 7);
+        await api.growthReport("w", 30);
+        await api.salesReport("w", 90);
+        await api.salesReport("w", 90, "p");
+        await api.listWebhooks("w");
+        await api.createWebhook("w", { url: "https://x.example" });
+        await api.updateWebhook("w", "h", { enabled: false });
+        await api.deleteWebhook("w", "h");
+        await api.rotateWebhookSecret("w", "h");
+        await api.testWebhook("w", "h");
+        await api.webhookDeliveries("w", "h");
+        await api.listApiKeys("w");
+        await api.createApiKey("w", { name: "K", scopes: ["events"] });
+        await api.updateApiKey("w", "k", { name: "L" });
+        await api.deleteApiKey("w", "k");
+        await api.adminStats();
+        await api.adminWorkspaces(2);
+        await api.setWorkspaceSending("w", true);
+        expect(calls).toEqual([
+            "GET /api/mail/crm/analytics/w/email?days=7",
+            "GET /api/mail/crm/analytics/w/growth?days=30",
+            "GET /api/mail/crm/analytics/w/sales?days=90",
+            "GET /api/mail/crm/analytics/w/sales?days=90&pipelineUid=p",
+            "GET /api/mail/crm/webhooks/w?limit=50",
+            'POST /api/mail/crm/webhooks/w {"url":"https://x.example"}',
+            'PUT /api/mail/crm/webhooks/w/h {"enabled":false}',
+            "DELETE /api/mail/crm/webhooks/w/h",
+            "POST /api/mail/crm/webhooks/w/h/secret",
+            "POST /api/mail/crm/webhooks/w/h/test",
+            "GET /api/mail/crm/webhooks/w/h/deliveries",
+            "GET /api/mail/crm/api-keys/w?limit=50",
+            'POST /api/mail/crm/api-keys/w {"name":"K","scopes":["events"]}',
+            'PUT /api/mail/crm/api-keys/w/k {"name":"L"}',
+            "DELETE /api/mail/crm/api-keys/w/k",
+            "GET /api/mail/crm/admin/stats",
+            "GET /api/mail/crm/admin/workspaces?limit=50&page=2",
+            'PUT /api/mail/crm/admin/workspaces/w {"sendingDisabled":true}',
+        ]);
+    });
+
     it("words errors", () => {
         expect(api.errorMessage(new ApiRequestError("Nope", 400), "Fallback")).toBe("Nope");
         expect(api.errorMessage(new Error("x"), "Fallback")).toBe("Fallback");

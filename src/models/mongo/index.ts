@@ -4,6 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 import { MailboxMongo } from "@rapidmx/restapi/mongo";
 import type { CrmModelClasses } from "../CrmModelClasses.js";
+import { ApiKeyMongo } from "./ApiKeyMongo.js";
 import { AutomationMongo } from "./AutomationMongo.js";
 import { AutomationVersionMongo } from "./AutomationVersionMongo.js";
 import { CampaignMongo } from "./CampaignMongo.js";
@@ -30,6 +31,8 @@ import { SegmentMongo } from "./SegmentMongo.js";
 import { SubscriptionMongo } from "./SubscriptionMongo.js";
 import { SuppressionMongo } from "./SuppressionMongo.js";
 import { TimelineEventMongo } from "./TimelineEventMongo.js";
+import { WebhookDeliveryMongo } from "./WebhookDeliveryMongo.js";
+import { WebhookEndpointMongo } from "./WebhookEndpointMongo.js";
 import { WorkspaceMongo } from "./WorkspaceMongo.js";
 import { WorkspaceMemberMongo } from "./WorkspaceMemberMongo.js";
 import { WorkspaceSenderMongo } from "./WorkspaceSenderMongo.js";
@@ -65,5 +68,8 @@ export const MONGO_MODELS: CrmModelClasses = {
     crmEvent: CrmEventMongo,
     pipeline: PipelineMongo,
     deal: DealMongo,
+    webhookEndpoint: WebhookEndpointMongo,
+    webhookDelivery: WebhookDeliveryMongo,
+    apiKey: ApiKeyMongo,
     mailbox: MailboxMongo,
 };

@@ -65,6 +65,9 @@ const MODELS: [string, string, string, string[], boolean][] = [
     ["CrmEvent", "crm_event", "CrmEvent", ["crm_event_dispatch", "crm_event_workspace", "crm_event_contact"], false],
     ["Pipeline", "pipeline", "CrmPipeline", ["crm_pipeline_workspace"], false],
     ["Deal", "deal", "CrmDeal", ["crm_deal_pipeline", "crm_deal_workspace", "crm_deal_company"], false],
+    ["WebhookEndpoint", "webhook_endpoint", "CrmWebhookEndpoint", ["crm_webhook_workspace"], false],
+    ["WebhookDelivery", "webhook_delivery", "CrmWebhookDelivery", ["crm_webhookdelivery_due", "crm_webhookdelivery_endpoint", "crm_webhookdelivery_workspace"], false],
+    ["ApiKey", "api_key", "CrmApiKey", ["crm_apikey_hash", "crm_apikey_workspace"], false],
 ];
 
 const ROUTES: [string, string][] = [
@@ -90,6 +93,11 @@ const ROUTES: [string, string][] = [
     ["Automation", "automations"],
     ["Pipeline", "pipelines"],
     ["Deal", "deals"],
+    ["Analytics", "analytics"],
+    ["Webhook", "webhooks"],
+    ["ApiKey", "api-keys"],
+    ["Integration", "integrations"],
+    ["CrmAdmin", "admin"],
 ];
 
 describe("plugin entry points", () => {
@@ -107,6 +115,7 @@ describe("plugin entry points", () => {
             [`AutomationTriggerJob${suffix}`]: "job",
             [`AutomationRunJob${suffix}`]: "job",
             [`TaskReminderJob${suffix}`]: "job",
+            [`WebhookDeliveryJob${suffix}`]: "job",
         };
         for (const [model] of MODELS) {
             expected[`${model}${suffix}`] = `model ${datastore}${model === "WorkspaceSender" ? " mailbox-scoped" : ""}`;
@@ -136,7 +145,7 @@ describe("plugin entry points", () => {
 });
 
 describe("plugin manifest", () => {
-    it("declares a valid manifest with the CRM app on the app rail", () => {
+    it("declares a valid manifest with the CRM app on the app rail and in the admin console", () => {
         const manifest: any = parsePluginManifest(pkg);
         expect(typeof manifest).toBe("object");
         expect(manifest).toEqual(expect.objectContaining({ displayName: "CRM", mailboxScopedData: true }));
@@ -144,8 +153,10 @@ describe("plugin manifest", () => {
             { id: "crm", host: "www", mount: "/crm", dir: "apps/crm" },
             { id: "subscriptions", host: "public", mount: "/subscriptions", dir: "apps/subscriptions" },
             { id: "forms", host: "public", mount: "/f", dir: "apps/f" },
+            { id: "crm-admin", host: "admin", mount: "/admin/crm", dir: "apps/admin-crm" },
         ]);
         expect(manifest.ui.appRail).toEqual([{ id: "crm", label: "CRM", href: "/crm", icon: "HiOutlineUserGroup" }]);
+        expect(manifest.ui.adminNav).toEqual([{ id: "crm", label: "CRM", href: "/admin/crm", icon: "HiOutlineUserGroup" }]);
         expect(manifest.settings.map((setting: any) => setting.key)).toEqual([
             "mail:crm:public_url",
             "mail:crm:workspace_creator_roles",

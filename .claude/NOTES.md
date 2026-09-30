@@ -223,6 +223,31 @@ Keep entries terse — this is a reference, not a transcript.
 - **1:1 email logging.** `WorkspaceSender.logEmail`, off by default. `CrmMailEventJob` logs `message.delivered` from a contact and
   `message.sent` to contacts as `email_received` or `email_sent` timeline entries, once per message and contact (`refUid`).
 
+- **Webhooks** (Phase 8):
+  - **SSRF.** `checkWebhookUrl` refuses non-https, credentials, IP literals off the public internet and `localhost`/`.local`/
+    `.internal` names when saved. `postWebhook` resolves the host at every post, refuses it if *any* address is private, then
+    connects to the address it checked (a custom `lookup` on the request), so a DNS rebind between check and connect can't reach
+    an internal address. Redirects are never followed.
+  - **Queueing.** `AutomationTriggerJob` queues a `WebhookDelivery` per enabled endpoint that takes the event (endpoints cached per
+    workspace per run); the automation `webhook` step queues an `automation.webhook` delivery. `WebhookDeliveryJob` posts them
+    with a version-checked lease.
+  - **Test seam.** Routes and the job post through `protected post: WebhookPoster` (defaults to `postWebhook`); `postWebhook` takes
+    `{ lookup, request }` so its unit tests never touch the network.
+  - **Secrets** are shown once (create and rotate); views carry `secretHint` (last 4 characters).
+- **API keys.** `crm_` + 32 random bytes base64url; only the SHA-256 is stored (`crm_apikey_hash`, unique). Revoking is deleting
+  (`revokedAt` is honoured if set directly). `lastUsedAt` is stamped at most once a minute. Contact upserts reuse
+  `BaseContactRoute.importRow` through an object-factory instance of the contact route.
+- **Reports** are computed live from `EngagementEvent`, `OutboundSend`, `TimelineEvent`, `CrmContact` and `Deal` rows, capped at
+  `MAX_REPORT_ROWS` (200,000) per kind, rather than from rollup tables as the plan had it; add `DailyWorkspaceStats` rollups if big
+  workspaces make them slow. Machine opens are excluded. Sales amounts add up regardless of currency (the UI says so).
+- **Charts** are plain SVG (`apps/shared/components/reports/Charts.tsx`), **not** Recharts as planned: no new dependency in the
+  server's page build, and jsdom-testable. Colors are the dataviz skill's reference categorical slots 1-3 (validated light and
+  dark), switched by `<html data-theme>` with a `prefers-color-scheme` fallback. Every chart has a legend or single title, end
+  labels, a hover/keyboard crosshair card and a table view.
+- **Admin.** `BaseCrmAdminRoute` requires a role in `trustedRoles` (no workspace access). `Workspace.sendingDisabled` makes
+  `SendDispatchJob` push that workspace's due messages `STOPPED_RETRY_MS` (15 min) later instead of sending them. The admin app is
+  `apps/admin-crm` (host `admin`, mount `/admin/crm`, `adminNav` id `crm`), wrapped in web-client's `AdminShell`.
+
 ## Session Log
 
 ### 2026-09-29 — Phase 1: the plugin created
@@ -303,3 +328,16 @@ Keep entries terse — this is a reference, not a transcript.
 - **New UI pages:** `/crm/deals` (kanban board), `/crm/deals/<uid>` and `/crm/pipelines`. The contact page gains a Deals section
   and the settings a per-sender logging toggle.
 - **Not done:** the booking-plugin integration (meetings on the timeline). It needs booking to publish an event.
+
+### 2026-09-30 — Phase 8: reports, webhooks, API keys, integration API, admin
+
+- **New models:** `WebhookEndpoint`, `WebhookDelivery` and `ApiKey`; new field `Workspace.sendingDisabled`.
+- **New routes:** `analytics`, `webhooks`, `api-keys`, `integrations` and `admin`.
+- **New job:** `WebhookDeliveryJob`.
+- **Automations:** a `custom` trigger (optionally matched by `config.name`) and a `webhook` step.
+- **New UI pages:** `/crm/reports`, `/crm/integrations` (webhooks; API keys for admins) and the admin console's `/admin/crm`.
+- **Tests:** 561; 100% statements/lines/functions, 95.5% branches.
+- **Not verified:** the charts and admin page haven't been looked at in a real browser (only jsdom), and webhooks haven't been
+  posted to a real receiver - both wait for JP's end-to-end testing. The plan's "allowed sender domains" and global rate limit in
+  the admin app weren't built: the rate limit is already the `send_rate_per_minute` setting, and senders are already limited to
+  mailboxes the member can send as.

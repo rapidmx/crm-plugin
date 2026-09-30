@@ -35,7 +35,7 @@ export function describeStep(node: AutomationNode, data: AutomationData): string
     const name = (records: { uid: string; name: string }[], uid: unknown, fallback: string) => records.find((record) => record.uid === uid)?.name ?? fallback;
     switch (node.type) {
         case "trigger":
-            return `When a contact ${(TRIGGER_EVENTS.find((entry) => entry.value === config.event)?.label ?? "…").toLowerCase()}`;
+            return `When a contact ${(TRIGGER_EVENTS.find((entry) => entry.value === config.event)?.label ?? "…").toLowerCase()}${config.event === "custom" && config.name ? ` named "${config.name}"` : ""}`;
         case "delay":
             return `Wait ${config.amount ?? "?"} ${config.unit ?? ""}`;
         case "wait":
@@ -62,6 +62,10 @@ export function describeStep(node: AutomationNode, data: AutomationData): string
             return `Notify ${data.members.find((member) => member.userUid === config.userUid)?.displayName ?? "a member"}`;
         case "enroll":
             return `Put into "${name(data.automations, config.automationUid, "…")}"`;
+        case "webhook": {
+            const endpoint = data.webhooks.find((entry) => entry.uid === config.endpointUid);
+            return `Post to ${endpoint ? endpoint.description || endpoint.url : "a webhook…"}`;
+        }
         default:
             return "End";
     }

@@ -254,8 +254,31 @@ describe("AutomationEditor", () => {
         expect(nodes.enroll).toEqual({ automationUid: "a2" });
     }, 60_000);
 
+    it("posts to a webhook, and starts from a named event reported through the API", async () => {
+        api.listWebhooks.mockResolvedValue([
+            { uid: "w1", url: "https://hooks.example.com/in", description: "Zapier", events: ["*"], enabled: true },
+            { uid: "w2", url: "https://other.example.com/", description: null, events: ["*"], enabled: true },
+        ]);
+        api.updateAutomation.mockImplementation(async (_w: string, _u: string, input: any) => automation({ ...input }));
+        await renderEditor(automation({ graph: { nodes: [{ id: "trigger", type: "trigger", config: { event: "list.subscribed" } }], edges: [] } }));
+        await select("trigger");
+        await userEvent.selectOptions(settings().getByLabelText("When a contact"), "custom");
+        await userEvent.type(settings().getByLabelText("Event name (empty: any event)"), "trial.started");
+        expect(button("Step trigger")).toHaveTextContent('When a contact has an event reported by your systems (api) named "trial.started"');
+        await userEvent.selectOptions(screen.getByLabelText("Add a step after trigger"), "webhook");
+        expect(button("Step webhook-1")).toHaveTextContent("Post to a webhook…");
+        await userEvent.selectOptions(settings().getByLabelText("Webhook"), "w2");
+        expect(button("Step webhook-1")).toHaveTextContent("Post to https://other.example.com/");
+        await userEvent.selectOptions(settings().getByLabelText("Webhook"), "w1");
+        expect(button("Step webhook-1")).toHaveTextContent("Post to Zapier");
+        await userEvent.click(button("Save draft"));
+        const nodes = Object.fromEntries(api.updateAutomation.mock.lastCall[2].graph.nodes.map((node: any) => [node.id, node.config]));
+        expect(nodes.trigger).toMatchObject({ event: "custom", name: "trial.started" });
+        expect(nodes["webhook-1"]).toEqual({ endpointUid: "w1" });
+    });
+
     it("describes steps with missing settings", () => {
-        const data: any = { lists: [], forms: [], segments: [], templates: [], senders: [], members: [], automations: [] };
+        const data: any = { lists: [], forms: [], segments: [], templates: [], senders: [], members: [], automations: [], webhooks: [] };
         const node = (type: string, config: Record<string, unknown> = {}) => describeStep({ id: "x", type: type as any, config }, data);
         expect(node("trigger", { event: "mystery" })).toBe("When a contact …");
         expect(node("delay")).toBe("Wait ? ");
@@ -269,6 +292,7 @@ describe("AutomationEditor", () => {
         expect(node("unsubscribe")).toBe("Unsubscribe from …");
         expect(node("create_task")).toBe('Create the task "…"');
         expect(node("notify")).toBe("Notify a member");
+        expect(node("trigger", { event: "custom" })).toBe("When a contact has an event reported by your systems (api)");
     });
 
     it("publishes (saving first), pauses and resumes, and shows the numbers", async () => {

@@ -13,6 +13,8 @@ import {
     HiOutlinePaperAirplane,
     HiOutlineFunnel,
     HiOutlineChartBar,
+    HiOutlineCodeBracket,
+    HiOutlinePresentationChartLine,
     HiOutlineBolt,
     HiOutlineCurrencyDollar,
     HiOutlineViewColumns,
@@ -30,7 +32,7 @@ import { Workspace, createWorkspace, errorMessage, listWorkspaces } from "../crm
 export type CrmPageProps = Omit<AppShellProps, "active">;
 
 /** The CRM's sections, each a page under `/crm`. */
-export type CrmSection = "contacts" | "companies" | "lists" | "deals" | "pipelines" | "segments" | "forms" | "templates" | "campaigns" | "automations" | "scoring" | "tasks" | "imports" | "settings";
+export type CrmSection = "contacts" | "companies" | "lists" | "deals" | "pipelines" | "segments" | "forms" | "templates" | "campaigns" | "automations" | "scoring" | "tasks" | "imports" | "reports" | "integrations" | "settings";
 
 /** Where the selected workspace is remembered between visits (per browser). */
 export const WORKSPACE_STORAGE_KEY = "rapidmx.crm.workspace";
@@ -51,6 +53,8 @@ const SECTIONS: { id: CrmSection; label: string; path: string; icon: IconType }[
     { id: "tasks", label: "Tasks", path: "/crm/tasks", icon: HiOutlineClipboardDocumentCheck },
     { id: "imports", label: "Import", path: "/crm/imports", icon: HiOutlineArrowUpTray },
     { id: "pipelines", label: "Pipelines", path: "/crm/pipelines", icon: HiOutlineViewColumns },
+    { id: "reports", label: "Reports", path: "/crm/reports", icon: HiOutlinePresentationChartLine },
+    { id: "integrations", label: "Integrations", path: "/crm/integrations", icon: HiOutlineCodeBracket },
     { id: "settings", label: "Settings", path: "/crm/settings", icon: HiOutlineCog6Tooth },
 ];
 

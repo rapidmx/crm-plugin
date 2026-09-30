@@ -13,6 +13,7 @@ import {
     Pipeline,
     Segment,
     WorkspaceMember,
+    WebhookEndpoint,
     WorkspaceSender,
     listAutomations,
     listForms,
@@ -21,6 +22,7 @@ import {
     listPipelines,
     listSegments,
     listSenders,
+    listWebhooks,
     searchTemplates,
 } from "../../crmApi.js";
 import { LIFECYCLE_STAGES } from "../../fields.js";
@@ -29,7 +31,7 @@ import FilterBuilder, { buildFilter, draftOf } from "../FilterBuilder.js";
 import { useSegmentFields } from "../SegmentManager.js";
 import { earlierSends, stepLabel } from "./flowModel.js";
 
-/** What the step settings pick from: the workspace's lists, forms, segments, templates, senders, members and automations. */
+/** What the step settings pick from: the workspace's lists, forms, segments, templates, senders, members, automations, pipelines and webhooks. */
 export interface AutomationData {
     lists: MailingList[];
     forms: CrmForm[];
@@ -39,9 +41,10 @@ export interface AutomationData {
     members: WorkspaceMember[];
     automations: Automation[];
     pipelines: Pipeline[];
+    webhooks: WebhookEndpoint[];
 }
 
-const EMPTY: AutomationData = { lists: [], forms: [], segments: [], templates: [], senders: [], members: [], automations: [], pipelines: [] };
+const EMPTY: AutomationData = { lists: [], forms: [], segments: [], templates: [], senders: [], members: [], automations: [], pipelines: [], webhooks: [] };
 
 /** Loads what the step settings pick from. Anything that fails to load is left empty. */
 export function useAutomationData(): AutomationData {
@@ -61,8 +64,9 @@ export function useAutomationData(): AutomationData {
             settle(listMembers(workspace.uid), []),
             settle(listAutomations(workspace.uid), []),
             settle(listPipelines(workspace.uid), []),
-        ]).then(([lists, forms, segments, templates, senders, members, automations, pipelines]) =>
-            setData({ lists, forms, segments, templates, senders, members, automations, pipelines }),
+            settle(listWebhooks(workspace.uid), []),
+        ]).then(([lists, forms, segments, templates, senders, members, automations, pipelines, webhooks]) =>
+            setData({ lists, forms, segments, templates, senders, members, automations, pipelines, webhooks }),
         );
     }, [workspace.uid]);
     return data;
@@ -86,6 +90,7 @@ export const TRIGGER_EVENTS: { value: string; label: string }[] = [
     { value: "deal.stage_changed", label: "Has a deal move to another stage" },
     { value: "deal.won", label: "Has a deal won" },
     { value: "deal.lost", label: "Has a deal lost" },
+    { value: "custom", label: "Has an event reported by your systems (API)" },
     { value: "manual", label: "Is put in by hand (or by another automation)" },
 ];
 
@@ -188,7 +193,8 @@ export default function StepInspector({
         case "trigger":
             fields = (
                 <>
-                    <Select label="When a contact" value={config.event} options={TRIGGER_EVENTS} onChange={(event) => onChange({ event, listUid: undefined, formUid: undefined, segmentUid: undefined, pipelineUid: undefined, stageId: undefined, fields: undefined })} />
+                    <Select label="When a contact" value={config.event} options={TRIGGER_EVENTS} onChange={(event) => onChange({ event, listUid: undefined, formUid: undefined, segmentUid: undefined, pipelineUid: undefined, stageId: undefined, fields: undefined, name: undefined })} />
+                    {config.event === "custom" && <Text label="Event name (empty: any event)" value={config.name} onChange={set("name")} />}
                     {(config.event === "list.subscribed" || config.event === "list.unsubscribed") && (
                         <Select label="List" value={config.listUid} options={names(data.lists)} empty="Any list" onChange={set("listUid")} />
                     )}
@@ -319,6 +325,22 @@ export default function StepInspector({
                     empty="Choose an automation…"
                     onChange={set("automationUid")}
                 />
+            );
+            break;
+        case "webhook":
+            fields = (
+                <>
+                    <Select
+                        label="Webhook"
+                        value={config.endpointUid}
+                        options={data.webhooks.map((endpoint) => ({ value: endpoint.uid, label: endpoint.description || endpoint.url }))}
+                        empty="Choose a webhook…"
+                        onChange={set("endpointUid")}
+                    />
+                    <p className="text-xs text-text-muted">
+                        Posts an <code>automation.webhook</code> event about the contact. Add webhooks under Integrations.
+                    </p>
+                </>
             );
             break;
         default:

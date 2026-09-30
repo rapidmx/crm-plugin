@@ -70,6 +70,10 @@ export class WorkspaceSQL extends BaseEntity implements Workspace {
     @Nullable
     public scoredAt?: Date;
 
+    @Column({ default: false })
+    @Description("Whether an administrator stopped its email.")
+    public sendingDisabled: boolean = false;
+
     constructor(other?: Partial<WorkspaceSQL>) {
         super(other);
 
@@ -83,6 +87,7 @@ export class WorkspaceSQL extends BaseEntity implements Workspace {
             this.scoringRules = other.scoringRules !== undefined ? other.scoringRules : this.scoringRules;
             this.scoringDirty = other.scoringDirty !== undefined ? other.scoringDirty : this.scoringDirty;
             this.scoredAt = "scoredAt" in other ? other.scoredAt : this.scoredAt;
+            this.sendingDisabled = other.sendingDisabled !== undefined ? other.sendingDisabled : this.sendingDisabled;
         }
     }
 }

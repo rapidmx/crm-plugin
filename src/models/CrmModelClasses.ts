@@ -38,6 +38,9 @@ export interface CrmModelClasses {
     crmEvent: any;
     pipeline: any;
     deal: any;
+    webhookEndpoint: any;
+    webhookDelivery: any;
+    apiKey: any;
     /** `@rapidmx/restapi`'s `Mailbox`. */
     mailbox: any;
 }

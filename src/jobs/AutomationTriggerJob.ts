@@ -7,7 +7,8 @@ import { ModelUtils, RepoUtils } from "@rapidrest/service-core";
 import { AutomationEngine, contactMatches, triggerMatches, triggerOf } from "../automation/Engine.js";
 import { WAIT_EVENTS } from "../automation/Graph.js";
 import { CrmEventType } from "../automation/Events.js";
-import { Automation, AutomationStatus, AutomationVersion, CrmContact, CrmEvent } from "../models/types.js";
+import { Automation, AutomationStatus, AutomationVersion, CrmContact, CrmEvent, WebhookEndpoint } from "../models/types.js";
+import { enabledEndpoints, enqueueDeliveries, eventPayload, wants } from "../webhooks/Deliveries.js";
 import { CrmJobBase } from "./CrmJobBase.js";
 const { Config } = ObjectDecorators;
 
@@ -21,7 +22,8 @@ interface LiveAutomation {
  * Hands each new `CrmEvent` to its workspace's automations, once (an event is claimed by stamping `dispatchedAt`, version-checked):
  * - it **enrolls** the contact in every active automation whose trigger matches the event (and whose trigger filter, if any, the
  * contact matches), as the automation's re-entry rule allows;
- * - it **resumes** the contact's enrollments waiting for this event about this message (`AutomationEngine.resumeWaiting()`).
+ * - it **resumes** the contact's enrollments waiting for this event about this message (`AutomationEngine.resumeWaiting()`);
+ * - it **queues webhooks** for the workspace's enabled endpoints that take the event's type (`WebhookDeliveryJob` posts them).
  *
  * Dispatched events are deleted after `retention_days`.
  */
@@ -52,6 +54,7 @@ export abstract class AutomationTriggerJob extends CrmJobBase {
         );
         const engine: AutomationEngine = this.engine();
         const automations: Map<string, Promise<LiveAutomation[]>> = new Map();
+        const webhooks: Map<string, Promise<WebhookEndpoint[]>> = new Map();
         for (const candidate of due) {
             try {
                 const event: CrmEvent = await events.update({ uid: candidate.uid, version: candidate.version, dispatchedAt: new Date() }, candidate, {
@@ -64,6 +67,15 @@ export abstract class AutomationTriggerJob extends CrmJobBase {
                     automations.set(event.workspaceUid, live);
                 }
                 await this.dispatch(engine, event, await live);
+                let endpoints: Promise<WebhookEndpoint[]> | undefined = webhooks.get(event.workspaceUid);
+                if (!endpoints) {
+                    endpoints = enabledEndpoints(this.repos(), event.workspaceUid);
+                    webhooks.set(event.workspaceUid, endpoints);
+                }
+                const wanting: WebhookEndpoint[] = (await endpoints).filter((endpoint) => wants(endpoint, event.type));
+                if (wanting.length > 0) {
+                    await enqueueDeliveries(this.repos(), this.classes, wanting, await eventPayload(this.repos(), event));
+                }
             } catch (err: any) {
                 if (!/version/i.test(err?.message ?? "")) {
                     this.logger?.error(`AutomationTriggerJob: event ${candidate.uid} failed: ${err?.message ?? err}`);

@@ -24,6 +24,7 @@ export const PORTS: Readonly<Record<NodeType, readonly string[]>> = {
     create_task: ["next"],
     notify: ["next"],
     enroll: ["next"],
+    webhook: ["next"],
     exit: [],
 };
 
@@ -66,6 +67,7 @@ export const STEP_TYPES: { group: string; types: { type: NodeType; label: string
             { type: "create_task", label: "Create a task" },
             { type: "notify", label: "Notify a member" },
             { type: "enroll", label: "Put into another automation" },
+            { type: "webhook", label: "Post to a webhook" },
             { type: "exit", label: "End" },
         ],
     },
