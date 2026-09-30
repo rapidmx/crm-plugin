@@ -92,10 +92,10 @@ export abstract class SendDispatchJob extends CrmJobBase {
             secret: await this.tokenSecret(),
             verp: this.verp,
         });
-        const campaigns: Map<string, Promise<Campaign | undefined>> = new Map();
+        const sources: Map<string, Promise<any>> = new Map();
         for (const candidate of due) {
             try {
-                if (!(await this.dispatch(candidate, renderer, campaigns))) {
+                if (!(await this.dispatch(candidate, renderer, sources))) {
                     return;
                 }
             } catch (err: any) {
@@ -105,13 +105,8 @@ export abstract class SendDispatchJob extends CrmJobBase {
     }
 
     /** Sends one message if it may go. `false` stops the run (the rate cap was reached). */
-    private async dispatch(candidate: OutboundSend, renderer: CampaignRenderer, campaigns: Map<string, Promise<Campaign | undefined>>): Promise<boolean> {
-        let campaign: Promise<Campaign | undefined> | undefined = campaigns.get(candidate.sourceUid);
-        if (!campaign) {
-            campaign = this.repo<Campaign>("campaign").then((repo) => repo.findOne(candidate.sourceUid, { ignoreACL: true, skipCache: true }));
-            campaigns.set(candidate.sourceUid, campaign);
-        }
-        const source: Campaign | undefined = candidate.sourceType === SendSource.CAMPAIGN ? await campaign : undefined;
+    private async dispatch(candidate: OutboundSend, renderer: CampaignRenderer, sources: Map<string, Promise<any>>): Promise<boolean> {
+        const source: Campaign | undefined = await this.sourceOf(candidate, sources);
         if (!source || source.status === CampaignStatus.CANCELLED) {
             await this.finish(candidate, { status: SendStatus.CANCELLED });
             return true;
@@ -163,6 +158,34 @@ export abstract class SendDispatchJob extends CrmJobBase {
         return true;
     }
 
+    /**
+     * What `send` was sent for, as a campaign: its campaign, or - for an automation's message - one made up of the message's own
+     * template and sender, tracked, and always going out. `undefined` when the campaign or automation is gone. Reads each once a run.
+     */
+    private async sourceOf(send: OutboundSend, sources: Map<string, Promise<any>>): Promise<Campaign | undefined> {
+        const model = send.sourceType === SendSource.CAMPAIGN ? "campaign" : "automation";
+        let source: Promise<any> | undefined = sources.get(send.sourceUid);
+        if (!source) {
+            source = this.repo(model).then((repo) => repo.findOne(send.sourceUid, { ignoreACL: true, skipCache: true }));
+            sources.set(send.sourceUid, source);
+        }
+        const found: any = await source;
+        if (!found || send.sourceType === SendSource.CAMPAIGN) {
+            return found;
+        }
+        return {
+            ...found,
+            status: CampaignStatus.SENDING,
+            templateUid: send.templateUid,
+            senderUid: send.senderUid,
+            listUids: [],
+            excludeListUids: [],
+            trackOpens: true,
+            trackClicks: true,
+            abTest: undefined,
+        };
+    }
+
     /** Takes `candidate` for this replica, or `undefined` when another took it first. */
     private async claim(candidate: OutboundSend): Promise<OutboundSend | undefined> {
         try {
@@ -184,7 +207,10 @@ export abstract class SendDispatchJob extends CrmJobBase {
         }
     }
 
-    /** The contact of `send` if they may still be mailed: active, not suppressed, and still on one of the campaign's lists. */
+    /**
+     * The contact of `send` if they may still be mailed: active, not suppressed, and still on one of the campaign's lists (an
+     * automation's message goes to its contact whatever their lists).
+     */
     private async eligibleContact(send: OutboundSend, campaign: Campaign): Promise<CrmContact | undefined> {
         const contact: CrmContact | undefined = await (await this.repo<CrmContact>("contact")).findOne(send.contactUid, { ignoreACL: true, skipCache: true });
         if (!contact || contact.emailStatus !== EmailStatus.ACTIVE) {
@@ -192,6 +218,9 @@ export abstract class SendDispatchJob extends CrmJobBase {
         }
         if ((await suppressedAmong(this.repos(), send.workspaceUid, [contact.email])).size > 0) {
             return undefined;
+        }
+        if (campaign.listUids.length === 0) {
+            return contact;
         }
         const subscribed: Subscription[] = await (await this.repo<Subscription>("subscription")).find(
             {

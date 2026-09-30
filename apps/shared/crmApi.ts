@@ -722,3 +722,97 @@ export const deleteScoringRule = (workspaceUid: string, uid: string): Promise<vo
     apiFetch(`/mail/crm/scoring-rules/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
 export const recalculateScores = (workspaceUid: string): Promise<{ changed: number }> =>
     apiFetch(`/mail/crm/scoring-rules/${enc(workspaceUid)}/recalculate`, json("POST", {}));
+
+// Automations
+
+export type NodeType =
+    | "trigger"
+    | "delay"
+    | "wait"
+    | "condition"
+    | "split"
+    | "send_email"
+    | "set_field"
+    | "add_tag"
+    | "remove_tag"
+    | "subscribe"
+    | "unsubscribe"
+    | "create_task"
+    | "notify"
+    | "enroll"
+    | "exit";
+
+export interface AutomationNode {
+    id: string;
+    type: NodeType;
+    config: Record<string, any>;
+}
+
+export interface AutomationEdge {
+    from: string;
+    to: string;
+    port: string;
+}
+
+export interface AutomationGraph {
+    nodes: AutomationNode[];
+    edges: AutomationEdge[];
+}
+
+export type AutomationStatus = "draft" | "active" | "paused";
+export type AutomationReentry = "never" | "after_exit";
+export type EnrollmentState = "active" | "waiting" | "completed" | "exited" | "failed";
+
+export interface Automation extends Stored {
+    workspaceUid: string;
+    name: string;
+    description?: string | null;
+    status: AutomationStatus;
+    graph: AutomationGraph;
+    reentry: AutomationReentry;
+    goalFilter?: FilterNode | null;
+    publishedVersionUid?: string | null;
+    publishedAt?: string | null;
+}
+
+export interface AutomationReport {
+    states: Record<EnrollmentState, number>;
+    nodes: Record<string, { current: number; sent?: number; opened?: number; clicked?: number; replied?: number }>;
+}
+
+export interface Enrollment extends Stored {
+    automationUid: string;
+    contactUid: string;
+    email?: string;
+    state: EnrollmentState;
+    currentNodeId: string;
+    nextRunAt: string;
+    enteredAt: string;
+    finishedAt?: string | null;
+    error?: string | null;
+    history: { nodeId: string; at: string; outcome: string }[];
+}
+
+export type AutomationInput = Partial<Pick<Automation, "name" | "description" | "graph" | "reentry" | "goalFilter" | "version">>;
+
+const automationPath = (workspaceUid: string, suffix: string = "") => `/mail/crm/automations/${enc(workspaceUid)}${suffix}`;
+
+export const listAutomations = (workspaceUid: string): Promise<Automation[]> => apiFetch(automationPath(workspaceUid, "?limit=200"));
+export const getAutomation = (workspaceUid: string, uid: string): Promise<Automation> => apiFetch(automationPath(workspaceUid, `/${enc(uid)}`));
+export const createAutomation = (workspaceUid: string, input: AutomationInput): Promise<Automation> => apiFetch(automationPath(workspaceUid), json("POST", input));
+export const updateAutomation = (workspaceUid: string, uid: string, input: AutomationInput): Promise<Automation> =>
+    apiFetch(automationPath(workspaceUid, `/${enc(uid)}`), json("PUT", input));
+export const deleteAutomation = (workspaceUid: string, uid: string): Promise<void> => apiFetch(automationPath(workspaceUid, `/${enc(uid)}`), json("DELETE"));
+/** Publishes, pauses or resumes an automation. */
+export const changeAutomation = (workspaceUid: string, uid: string, action: "publish" | "pause" | "resume"): Promise<Automation> =>
+    apiFetch(automationPath(workspaceUid, `/${enc(uid)}/${action}`), json("POST", {}));
+export const enrollInAutomation = (workspaceUid: string, uid: string, contactUids: string[]): Promise<{ enrolled: number }> =>
+    apiFetch(automationPath(workspaceUid, `/${enc(uid)}/enroll`), json("POST", { contactUids }));
+export const automationReport = (workspaceUid: string, uid: string): Promise<AutomationReport> => apiFetch(automationPath(workspaceUid, `/${enc(uid)}/report`));
+export const listEnrollments = (
+    workspaceUid: string,
+    uid: string,
+    query: { state?: EnrollmentState; contactUid?: string; page: number; limit?: number },
+): Promise<SearchResult<Enrollment>> => apiFetch(automationPath(workspaceUid, `/${enc(uid)}/enrollments`), json("POST", query));
+export const exitEnrollment = (workspaceUid: string, uid: string, enrollmentUid: string): Promise<Enrollment> =>
+    apiFetch(automationPath(workspaceUid, `/${enc(uid)}/enrollments/${enc(enrollmentUid)}/exit`), json("POST", {}));

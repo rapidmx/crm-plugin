@@ -87,6 +87,8 @@ export function stubBasics(api: any, overrides: { workspaces?: any[] } = {}): vo
     api.listSegments.mockResolvedValue([]);
     api.listScoringRules.mockResolvedValue([]);
     api.previewSegment.mockResolvedValue({ count: 0, capped: false, contacts: [] });
+    api.listAutomations.mockResolvedValue([]);
+    api.listEnrollments.mockResolvedValue({ items: [], total: 0 });
 }
 
 export function list(overrides: Record<string, unknown> = {}): any {
@@ -181,4 +183,21 @@ export function segment(overrides: Record<string, unknown> = {}): any {
 
 export function scoringRule(overrides: Record<string, unknown> = {}): any {
     return { uid: "r1", workspaceUid: "w1", name: "VIP", enabled: true, kind: "property", filter: { field: "tags", op: "eq", value: "vip" }, points: 20, ...stored, ...overrides };
+}
+
+export function automation(overrides: Record<string, unknown> = {}): any {
+    return {
+        uid: "a1",
+        workspaceUid: "w1",
+        name: "Welcome",
+        description: null,
+        status: "draft",
+        graph: { nodes: [{ id: "trigger", type: "trigger", config: { event: "list.subscribed" } }], edges: [] },
+        reentry: "never",
+        goalFilter: null,
+        publishedVersionUid: null,
+        publishedAt: null,
+        ...stored,
+        ...overrides,
+    };
 }

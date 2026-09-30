@@ -30,6 +30,7 @@ import { readOrCreateTokenSecret } from "../util/Secrets.js";
 import { TokenPayload, signToken } from "../util/Tokens.js";
 import { assertWorkspaceAccess, notFound } from "../util/WorkspaceAccess.js";
 import { badRequest } from "../util/Validation.js";
+import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
 const { Config, Inject, Logger } = ObjectDecorators;
 
 /** The `PropertyValue.key` a contact's subscribed lists are mirrored under, so filters can match list membership. */
@@ -322,6 +323,19 @@ export abstract class CrmRouteBase {
                 data: { listUid, source: change.source },
                 refUid: listUid,
             });
+        }
+        if (status !== SubscriptionStatus.PENDING) {
+            await recordCrmEvent(
+                this.repos(),
+                this.classes,
+                {
+                    workspaceUid,
+                    type: status === SubscriptionStatus.SUBSCRIBED ? CrmEventType.LIST_SUBSCRIBED : CrmEventType.LIST_UNSUBSCRIBED,
+                    contactUid,
+                    data: { listUid, source: change.source },
+                },
+                this.logger,
+            );
         }
         this.notify(workspaceUid, "CrmSubscription", existing ? "update" : "create", JSON.parse(JSON.stringify(subscription)));
         return subscription;

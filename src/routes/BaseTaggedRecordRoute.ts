@@ -19,6 +19,7 @@ import {
 } from "../util/PropertyValues.js";
 import { MAX_TAGS, badRequest, readTags, requireObject } from "../util/Validation.js";
 import { BaseWorkspaceRecordRoute, WorkspaceRecord, WriteContext } from "./BaseWorkspaceRecordRoute.js";
+import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
 const { Config } = ObjectDecorators;
 const { Param, Post, Response, User: AuthUser } = RouteDecorators;
 
@@ -161,7 +162,35 @@ export abstract class BaseTaggedRecordRoute<T extends TaggedRecord> extends Base
                 actorUserUid: context.user.uid.toLowerCase() || undefined,
                 data: before ? { fields: changed } : {},
             });
+            if (this.objectType === CrmObjectType.CONTACT) {
+                await recordCrmEvent(
+                    this.repos(),
+                    this.classes,
+                    {
+                        workspaceUid: context.workspaceUid,
+                        type: before ? CrmEventType.CONTACT_UPDATED : CrmEventType.CONTACT_CREATED,
+                        contactUid: record.uid,
+                        data: before ? { fields: changed } : {},
+                    },
+                    this.logger,
+                );
+            }
         }
+    }
+
+    /**
+     * Changes `existing` as `PUT /:workspaceUid/:uid` with `body` would, on behalf of `actorUid` (empty for nobody in particular) - for
+     * automations, which change records outside any request. Returns the record as saved.
+     */
+    public async applyUpdate(workspaceUid: string, actorUid: string, existing: T, body: Record<string, unknown>): Promise<T> {
+        const context: WriteContext = { workspaceUid, user: { uid: actorUid } as JWTUser };
+        const fields: Partial<T> = await this.readUpdate(body, existing, context);
+        const updated: T = await (await this.records()).update({ ...fields, uid: existing.uid, version: existing.version }, existing, {
+            ignoreACL: true,
+            skipPush: true,
+        });
+        await this.afterWrite(updated, existing, body, context);
+        return updated;
     }
 
     protected override async afterDelete(record: T, context: WriteContext): Promise<void> {

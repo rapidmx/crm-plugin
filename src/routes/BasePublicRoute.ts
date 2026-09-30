@@ -32,6 +32,7 @@ import { EngagementRecorder } from "../sending/Engagement.js";
 import { MAX_TOKEN_LENGTH, TokenPayload, verifyToken } from "../util/Tokens.js";
 import { badRequest, isObject, readEmail, readText } from "../util/Validation.js";
 import { notFound } from "../util/WorkspaceAccess.js";
+import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
 const { Config, Inject } = ObjectDecorators;
 const { Get, Param, Post, Request, Response } = RouteDecorators;
 
@@ -176,6 +177,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
             data: { formUid: form.uid },
             refUid: form.uid,
         });
+        await recordCrmEvent(this.repos(), this.classes, { workspaceUid: form.workspaceUid, type: CrmEventType.FORM_SUBMITTED, contactUid, data: { formUid: form.uid } }, this.logger);
         await this.countSubmission(form);
         return pending.length > 0 ? { result: "confirm", message: "Check your inbox to confirm your subscription.", redirectUrl: form.redirectUrl ?? undefined } : doneMessage;
     }

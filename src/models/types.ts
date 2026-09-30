@@ -254,6 +254,8 @@ export enum TimelineKind {
     EMAIL_REPLIED = "email_replied",
     EMAIL_BOUNCED = "email_bounced",
     EMAIL_COMPLAINED = "email_complained",
+    AUTOMATION_ENTERED = "automation_entered",
+    AUTOMATION_FINISHED = "automation_finished",
 }
 
 /** One entry of a contact's, company's or deal's activity timeline. Append-only. */
@@ -620,6 +622,14 @@ export interface OutboundSend extends CrmEntity {
     bounceType?: string;
     complainedAt?: Date;
     unsubscribedAt?: Date;
+    /** An automation message's step (its `send_email` node). */
+    nodeId?: string;
+    /** An automation message's template (a campaign's comes from the campaign). */
+    templateUid?: string;
+    /** An automation message's sender. */
+    senderUid?: string;
+    /** An automation message's subject line, replacing the template's. */
+    subject?: string;
 }
 
 /** What an engagement event records. */
@@ -709,4 +719,118 @@ export interface ScoringRule extends CrmEntity {
     maxPoints?: number;
     /** An activity rule counts only what happened in these last days. None: ever. */
     withinDays?: number;
+}
+
+/** Where an automation is. */
+export enum AutomationStatus {
+    /** Never published: contacts can't enter it. */
+    DRAFT = "draft",
+    /** Its published version enrolls contacts and moves them along. */
+    ACTIVE = "active",
+    /** Nobody enters it and nobody moves on until it is resumed. */
+    PAUSED = "paused",
+}
+
+/** When a contact may enter an automation again. */
+export enum AutomationReentry {
+    /** Once, ever. */
+    NEVER = "never",
+    /** Again once their last run through it has finished. */
+    AFTER_EXIT = "after_exit",
+}
+
+/**
+ * A workflow contacts go through: a trigger, then steps - waits, conditions, emails and actions - joined by edges. `graph` is the
+ * draft being edited; contacts go through the published version (`AutomationVersion`), which a new publish replaces for new
+ * enrollments only.
+ */
+export interface Automation extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    description?: string;
+    status: AutomationStatus;
+    /** The draft - see `automation/Graph.ts`. */
+    graph: unknown;
+    reentry: AutomationReentry;
+    /** Contacts matching this contact filter leave the automation, their goal reached. */
+    goalFilter?: unknown;
+    publishedVersionUid?: string;
+    publishedAt?: Date;
+    createdByUserUid: string;
+}
+
+/** An automation's graph as published. Immutable: running enrollments keep going through the version they entered. */
+export interface AutomationVersion extends CrmEntity {
+    workspaceUid: string;
+    automationUid: string;
+    /** 1 for the first publish, and so on. */
+    versionNumber: number;
+    graph: unknown;
+    publishedByUserUid: string;
+}
+
+/** Where a contact is in an automation. */
+export enum EnrollmentState {
+    /** Due to move on at `nextRunAt`. */
+    ACTIVE = "active",
+    /** Waiting for something to happen (`waitFor`), at most until `nextRunAt`. */
+    WAITING = "waiting",
+    /** Went through to the end, or reached the goal. */
+    COMPLETED = "completed",
+    /** Taken out: by a member, or because the contact or automation went away. */
+    EXITED = "exited",
+    /** Stopped by an error (`error`). */
+    FAILED = "failed",
+}
+
+/** What a waiting enrollment waits for. */
+export interface EnrollmentWait {
+    /** The node the enrollment waits at. */
+    nodeId: string;
+    /** The event that ends the wait, for a wait node; none for a delay. */
+    event?: string;
+    /** The message the event must be about. */
+    sendUid?: string;
+}
+
+/** One step an enrollment took. */
+export interface EnrollmentStep {
+    nodeId: string;
+    at: Date;
+    /** What happened: `next`, `yes`, `timeout`, `sent`... */
+    outcome: string;
+}
+
+/** One contact's run through an automation. */
+export interface Enrollment extends CrmEntity {
+    workspaceUid: string;
+    automationUid: string;
+    versionUid: string;
+    contactUid: string;
+    state: EnrollmentState;
+    currentNodeId: string;
+    nextRunAt: Date;
+    waitFor?: EnrollmentWait;
+    leaseExpiresAt?: Date;
+    /** How many steps it has taken, to stop a runaway loop. */
+    steps: number;
+    /** Its most recent steps. */
+    history: EnrollmentStep[];
+    enteredAt: Date;
+    finishedAt?: Date;
+    error?: string;
+}
+
+/**
+ * Something that happened to a contact, for automations to react to: contact.created, contact.updated, list.subscribed,
+ * list.unsubscribed, form.submitted, segment.entered, segment.left, email.sent, email.opened, email.clicked, email.replied,
+ * email.bounced, email.unsubscribed. `AutomationTriggerJob` hands each to the workspace's automations once (`dispatchedAt`).
+ */
+export interface CrmEvent extends CrmEntity {
+    workspaceUid: string;
+    type: string;
+    contactUid: string;
+    occurredAt: Date;
+    data: Record<string, unknown>;
+    dispatchedAt?: Date;
 }

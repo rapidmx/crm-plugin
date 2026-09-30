@@ -25,3 +25,7 @@ export { OutboundSendMongo } from "../../../src/models/mongo/OutboundSendMongo.j
 export { EngagementEventMongo } from "../../../src/models/mongo/EngagementEventMongo.js";
 export { SegmentMongo } from "../../../src/models/mongo/SegmentMongo.js";
 export { ScoringRuleMongo } from "../../../src/models/mongo/ScoringRuleMongo.js";
+export { AutomationMongo } from "../../../src/models/mongo/AutomationMongo.js";
+export { AutomationVersionMongo } from "../../../src/models/mongo/AutomationVersionMongo.js";
+export { EnrollmentMongo } from "../../../src/models/mongo/EnrollmentMongo.js";
+export { CrmEventMongo } from "../../../src/models/mongo/CrmEventMongo.js";

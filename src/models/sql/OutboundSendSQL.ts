@@ -153,6 +153,26 @@ export class OutboundSendSQL extends BaseEntity implements OutboundSend {
     @Nullable
     public unsubscribedAt?: Date;
 
+    @Column({ nullable: true })
+    @Description("An automation message's step.")
+    @Nullable
+    public nodeId?: string;
+
+    @Column({ nullable: true })
+    @Description("An automation message's template.")
+    @Nullable
+    public templateUid?: string;
+
+    @Column({ nullable: true })
+    @Description("An automation message's sender.")
+    @Nullable
+    public senderUid?: string;
+
+    @Column({ type: "text", nullable: true })
+    @Description("An automation message's subject line.")
+    @Nullable
+    public subject?: string;
+
     constructor(other?: Partial<OutboundSendSQL>) {
         super(other);
 
@@ -183,6 +203,10 @@ export class OutboundSendSQL extends BaseEntity implements OutboundSend {
             this.bounceType = "bounceType" in other ? other.bounceType : this.bounceType;
             this.complainedAt = "complainedAt" in other ? other.complainedAt : this.complainedAt;
             this.unsubscribedAt = "unsubscribedAt" in other ? other.unsubscribedAt : this.unsubscribedAt;
+            this.nodeId = "nodeId" in other ? other.nodeId : this.nodeId;
+            this.templateUid = "templateUid" in other ? other.templateUid : this.templateUid;
+            this.senderUid = "senderUid" in other ? other.senderUid : this.senderUid;
+            this.subject = "subject" in other ? other.subject : this.subject;
         }
     }
 }

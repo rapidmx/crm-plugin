@@ -6,7 +6,7 @@ import { ModelUtils, RouteDecorators } from "@rapidrest/service-core";
 import type { JWTUser } from "@rapidrest/core";
 import { FilterNode } from "../filters/Filter.js";
 import { CrmContact, Segment, SegmentKind, WorkspaceAction } from "../models/types.js";
-import { SEGMENTS_KEY, matchingContacts, readSegmentFilter, refreshSegment } from "../segments/Segments.js";
+import { SEGMENTS_KEY, matchingContacts, readSegmentFilter, recordSegmentEvents, refreshSegment } from "../segments/Segments.js";
 import { badRequest, readEnum, readText, requireObject } from "../util/Validation.js";
 import { BaseWorkspaceRecordRoute, WriteContext } from "./BaseWorkspaceRecordRoute.js";
 const { Param, Post, User: AuthUser } = RouteDecorators;
@@ -80,9 +80,15 @@ export abstract class BaseSegmentRoute extends BaseWorkspaceRecordRoute<Segment>
         );
     }
 
-    /** Works `segment`'s members out and saves the counts. Returns the segment as saved. */
-    private async refresh(segment: Segment): Promise<Segment> {
-        const { counts } = await refreshSegment(this.repos(), this.classes, segment);
+    /**
+     * Works `segment`'s members out and saves the counts. Returns the segment as saved. With `events`, who entered and left is
+     * recorded for automations - not on a segment's first working out, or everyone in it would count as just entered.
+     */
+    private async refresh(segment: Segment, events: boolean = false): Promise<Segment> {
+        const { counts, entered, left } = await refreshSegment(this.repos(), this.classes, segment);
+        if (events) {
+            await recordSegmentEvents(this.repos(), this.classes, segment, entered, left, this.logger);
+        }
         const records = await this.records();
         const current: Segment = (await records.findOne(segment.uid, { ignoreACL: true, skipCache: true }))!;
         return await records.update({ ...counts, uid: current.uid, version: current.version }, current, { ignoreACL: true, skipPush: true });
@@ -114,7 +120,7 @@ export abstract class BaseSegmentRoute extends BaseWorkspaceRecordRoute<Segment>
     @Post("/:workspaceUid/:uid/refresh")
     public async refreshNow(@Param("workspaceUid") workspaceUid: string, @Param("uid") uid: string, @AuthUser user?: JWTUser): Promise<Segment> {
         await this.requireAccess(user, workspaceUid, WorkspaceAction.WRITE);
-        const saved: Segment = await this.refresh(await this.requireRecord(workspaceUid, uid));
+        const saved: Segment = await this.refresh(await this.requireRecord(workspaceUid, uid), true);
         const view: Segment = JSON.parse(JSON.stringify(saved));
         this.notify(workspaceUid, this.pushType, "update", view);
         return view;

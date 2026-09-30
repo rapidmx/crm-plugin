@@ -175,6 +175,37 @@ Keep entries terse — this is a reference, not a transcript.
 - **New columns on existing tables need a database default** (`@Column({ default })`). The schema is synchronized, not migrated, so a
   NOT NULL column without one fails on a table that has rows (it did, on SQLite). `genmodels.py` takes an optional 6th field element
   as the SQL default.
+- **Automations** (Phase 6):
+  - **Event log.** `CrmEvent` rows are the log automations read. `recordCrmEvent()` never throws, and is called from:
+    - `BaseTaggedRecordRoute.afterWrite` (contacts only): contact.created and contact.updated with `fields`;
+    - `CrmRouteBase.setSubscription`: list.subscribed and list.unsubscribed;
+    - the public form route: form.submitted;
+    - segment refreshes: segment.entered and segment.left, from the job and manual refreshes, but not a segment's first working
+      out;
+    - `EngagementRecorder`: email.*, except automatic opens and clicks, repeat opens, and failures.
+  - **Trigger job.** `AutomationTriggerJob` claims events by stamping `dispatchedAt`, enrolls the contact in matching active
+    automations, and resumes waits on email events. It prunes dispatched events after 30 days.
+  - **Graph.**
+    - `automation/Graph.ts` defines the graph: nodes and edges with ports (`next`, `yes`/`no`, `a`/`b`, `matched`/`timeout`).
+    - `validateGraph` checks shape only, so a half-built draft saves. `validateForPublish` checks the whole flow, and the route then
+      checks that everything named exists in the workspace.
+    - A publish makes an immutable `AutomationVersion` (its number is `versionNumber`, since `version` is the optimistic lock).
+      Enrollments keep their version.
+  - **Engine.** `automation/Engine.ts`, `AutomationEngine`.
+    - `advance()` runs up to 25 steps per run, stopping at a delay or wait, and fails a run after 1000 steps in all.
+    - The goal filter is checked before each run.
+    - A delay or wait records `waitFor.nodeId`, so coming back to that node means "time is up".
+    - Wait-for-email looks up the step's send by `dedupeKey` `automation:<enrollment>:<node>`, and matches at once if it already
+      happened.
+    - Contact changes go through the contact route's new public `applyUpdate()`, so tags, the timeline and events behave as for
+      a member's edit.
+  - **Automation emails** are `OutboundSend` rows with `sourceType` automation and their own
+    `nodeId`/`templateUid`/`senderUid`/`subject`.
+    - The dispatcher makes up a campaign for them: tracked, no list requirement, and the unsubscribe link unsubscribes from all.
+    - The mail event job checks the send's own sender.
+  - **Editor.** The UI is a vertical branching flow (`apps/shared/components/automations/`), **not** `@xyflow/react` as planned:
+    no new dependency or stylesheet for the server's page build. Joins and loops show as "Go to step" jumps. `flowModel.ts` holds
+    the pure edits (insert, remove, connect, prune, layout) and the recipes.
 
 ## Session Log
 
@@ -237,3 +268,12 @@ Keep entries terse — this is a reference, not a transcript.
 - **New UI pages:** `/crm/segments` and `/crm/scoring`. The contact list takes `?segment=` and offers segments as a filter field; the
   campaign editor has segment pickers.
 - **Git:** JP added the remote (`origin`, `git@github.com:rapidmx/crm-plugin.git`) and asked for a push after each phase commit.
+
+### 2026-09-30 — Phase 6: automations
+
+- **New models:** `Automation`, `AutomationVersion`, `Enrollment` and `CrmEvent`, plus automation fields on `OutboundSend`.
+- **New route:** `automations`.
+- **New jobs:** `AutomationTriggerJob` and `AutomationRunJob`.
+- **New UI pages:** `/crm/automations` (list, with recipes) and `/crm/automations/<uid>` (flow editor, settings, contacts in it).
+- **Bug caught by tests:** creating an automation ignored `goalFilter`.
+- **Not done:** date-property triggers (birthdays, renewals). The webhook step comes with Phase 8's webhooks.

@@ -146,16 +146,20 @@ export default function SegmentManager() {
     );
 }
 
-/** The fields a segment's filter may use: every contact field but segments. */
-export function useSegmentFields(): FieldInfo[] {
+/** The fields a contact filter may use: every contact field - but segments, unless `withSegments` (a segment's own filter can't). */
+export function useSegmentFields(withSegments: boolean = false): FieldInfo[] {
     const { workspace } = useCrm();
     const [definitions, setDefinitions] = useState<PropertyDefinition[]>([]);
     const [lists, setLists] = useState<MailingList[]>([]);
+    const [segments, setSegments] = useState<Segment[]>([]);
     useEffect(() => {
         listProperties(workspace.uid, "contact").then(setDefinitions, () => setDefinitions([]));
         listLists(workspace.uid).then(setLists, () => setLists([]));
+        if (withSegments) {
+            listSegments(workspace.uid).then(setSegments, () => setSegments([]));
+        }
     }, [workspace.uid]);
-    return useMemo(() => recordFields("contact", definitions, lists, null), [definitions, lists]);
+    return useMemo(() => recordFields("contact", definitions, lists, withSegments ? segments : null), [definitions, lists, segments]);
 }
 
 /** Creates or changes a segment, counting the contacts its filter matches as it is edited. */

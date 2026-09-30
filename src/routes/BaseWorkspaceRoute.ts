@@ -25,6 +25,10 @@ export const MAX_SENDERS = 50;
 
 /** Every model whose rows belong to a workspace (by `workspaceUid`), deleted with it. */
 const WORKSPACE_DATA: readonly CrmModelName[] = [
+    "crmEvent",
+    "enrollment",
+    "automationVersion",
+    "automation",
     "scoringRule",
     "segment",
     "engagementEvent",

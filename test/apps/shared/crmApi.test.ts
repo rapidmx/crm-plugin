@@ -225,6 +225,32 @@ describe("crmApi", () => {
         ]);
     });
 
+    it("calls each automation endpoint", async () => {
+        const calls = recordCalls(() => jsonResponse(200, {}));
+        await api.listAutomations("w");
+        await api.getAutomation("w", "a");
+        await api.createAutomation("w", { name: "A" });
+        await api.updateAutomation("w", "a", { name: "B" });
+        await api.deleteAutomation("w", "a");
+        await api.changeAutomation("w", "a", "publish");
+        await api.enrollInAutomation("w", "a", ["c"]);
+        await api.automationReport("w", "a");
+        await api.listEnrollments("w", "a", { page: 0 });
+        await api.exitEnrollment("w", "a", "e");
+        expect(calls).toEqual([
+            "GET /api/mail/crm/automations/w?limit=200",
+            "GET /api/mail/crm/automations/w/a",
+            'POST /api/mail/crm/automations/w {"name":"A"}',
+            'PUT /api/mail/crm/automations/w/a {"name":"B"}',
+            "DELETE /api/mail/crm/automations/w/a",
+            "POST /api/mail/crm/automations/w/a/publish {}",
+            'POST /api/mail/crm/automations/w/a/enroll {"contactUids":["c"]}',
+            "GET /api/mail/crm/automations/w/a/report",
+            'POST /api/mail/crm/automations/w/a/enrollments {"page":0}',
+            "POST /api/mail/crm/automations/w/a/enrollments/e/exit {}",
+        ]);
+    });
+
     it("uploads a CSV file as the raw body and reads the answer", async () => {
         const fetchMock = mockFetch(() => jsonResponse(200, { import: { uid: "i" }, targets: [], preview: [] }));
         const file = new File(["email\na@x.example"], "people list.csv", { type: "text/csv" });

@@ -5,7 +5,7 @@
 import { ObjectDecorators } from "@rapidrest/core";
 import { ModelUtils, RepoUtils } from "@rapidrest/service-core";
 import { Segment, SegmentKind } from "../models/types.js";
-import { SegmentRefresh, refreshSegment } from "../segments/Segments.js";
+import { SegmentRefresh, recordSegmentEvents, refreshSegment } from "../segments/Segments.js";
 import { CrmJobBase } from "./CrmJobBase.js";
 const { Config } = ObjectDecorators;
 
@@ -63,8 +63,8 @@ export abstract class SegmentRefreshJob extends CrmJobBase {
         }
     }
 
-    /** Who entered and left a segment in a refresh - where automations hook in. */
-    protected async membersChanged(_segment: Segment, _entered: string[], _left: string[]): Promise<void> {
-        // Nothing yet.
+    /** Records who entered and left a segment in a refresh, for automations. */
+    protected async membersChanged(segment: Segment, entered: string[], left: string[]): Promise<void> {
+        await recordSegmentEvents(this.repos(), this.classes, segment, entered, left, this.logger);
     }
 }

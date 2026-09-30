@@ -59,6 +59,10 @@ const MODELS: [string, string, string, string[], boolean][] = [
     ["EngagementEvent", "engagement_event", "CrmEngagementEvent", ["crm_engagement_source", "crm_engagement_contact", "crm_engagement_send", "crm_engagement_workspace"], false],
     ["Segment", "segment", "CrmSegment", ["crm_segment_workspace", "crm_segment_refresh"], false],
     ["ScoringRule", "scoring_rule", "CrmScoringRule", ["crm_scoring_workspace"], false],
+    ["Automation", "automation", "CrmAutomation", ["crm_automation_workspace"], false],
+    ["AutomationVersion", "automation_version", "CrmAutomationVersion", ["crm_automationversion_automation", "crm_automationversion_workspace"], false],
+    ["Enrollment", "enrollment", "CrmEnrollment", ["crm_enrollment_due", "crm_enrollment_automation", "crm_enrollment_contact", "crm_enrollment_workspace"], false],
+    ["CrmEvent", "crm_event", "CrmEvent", ["crm_event_dispatch", "crm_event_workspace", "crm_event_contact"], false],
 ];
 
 const ROUTES: [string, string][] = [
@@ -81,6 +85,7 @@ const ROUTES: [string, string][] = [
     ["Tracking", "t"],
     ["Segment", "segments"],
     ["ScoringRule", "scoring-rules"],
+    ["Automation", "automations"],
 ];
 
 describe("plugin entry points", () => {
@@ -95,6 +100,8 @@ describe("plugin entry points", () => {
             [`CrmMailEventJob${suffix}`]: "job",
             [`SegmentRefreshJob${suffix}`]: "job",
             [`ScoringJob${suffix}`]: "job",
+            [`AutomationTriggerJob${suffix}`]: "job",
+            [`AutomationRunJob${suffix}`]: "job",
         };
         for (const [model] of MODELS) {
             expected[`${model}${suffix}`] = `model ${datastore}${model === "WorkspaceSender" ? " mailbox-scoped" : ""}`;

@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MPL-2.0
 ///////////////////////////////////////////////////////////////////////////////
 import { ModelUtils } from "@rapidrest/service-core";
+import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
 import type { CrmModelClasses, CrmRepos } from "../models/CrmModelClasses.js";
 import {
-    Campaign,
     CrmContact,
     CrmObjectType,
     EmailStatus,
@@ -69,6 +69,7 @@ export class EngagementRecorder {
             { ignoreACL: true, skipPush: true },
         );
         await this.followUp(send, updated, type, data, at);
+        await this.recordEvent(send, updated, type, data);
         return updated;
     }
 
@@ -229,12 +230,41 @@ export class EngagementRecorder {
 
     /** How the timeline names what was sent: the campaign's name in quotes, or "an email". */
     private async sourceName(send: OutboundSend): Promise<string> {
-        if (send.sourceType === SendSource.CAMPAIGN) {
-            const campaign: Campaign | undefined = await (await this.repos.get<Campaign>("campaign")).findOne(send.sourceUid, { ignoreACL: true });
-            if (campaign) {
-                return `"${campaign.name}"`;
-            }
+        const source: { name: string } | undefined = await (await this.repos.get(send.sourceType === SendSource.CAMPAIGN ? "campaign" : "automation")).findOne(
+            send.sourceUid,
+            { ignoreACL: true },
+        );
+        return source ? `"${source.name}"` : "an email";
+    }
+
+    /**
+     * Records the automation event of an engagement: every one but a failure, an automatic open or click, and a repeat open (only the
+     * first open a person makes is an event).
+     */
+    private async recordEvent(before: OutboundSend, after: OutboundSend, type: EngagementType, data: EngagementData): Promise<void> {
+        const types: Partial<Record<EngagementType, CrmEventType>> = {
+            [EngagementType.SENT]: CrmEventType.EMAIL_SENT,
+            [EngagementType.OPENED]: CrmEventType.EMAIL_OPENED,
+            [EngagementType.CLICKED]: CrmEventType.EMAIL_CLICKED,
+            [EngagementType.REPLIED]: CrmEventType.EMAIL_REPLIED,
+            [EngagementType.BOUNCED]: CrmEventType.EMAIL_BOUNCED,
+            [EngagementType.UNSUBSCRIBED]: CrmEventType.EMAIL_UNSUBSCRIBED,
+        };
+        const event: CrmEventType | undefined = types[type];
+        const repeatOpen: boolean = type === EngagementType.OPENED && !!before.firstOpenedAt && !before.machineOpen;
+        if (!event || data.machine || repeatOpen) {
+            return;
         }
-        return "an email";
+        await recordCrmEvent(
+            this.repos,
+            this.classes,
+            {
+                workspaceUid: after.workspaceUid,
+                type: event,
+                contactUid: after.contactUid,
+                data: { sendUid: after.uid, sourceType: after.sourceType, sourceUid: after.sourceUid, nodeId: after.nodeId, ...(data.url ? { url: data.url } : {}) },
+            },
+            this.logger,
+        );
     }
 }

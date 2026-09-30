@@ -94,7 +94,7 @@ export class CampaignRenderer {
             list: firstList ? { name: firstList.publicName } : undefined,
             links,
         });
-        const email: RenderedEmail = await renderEmail(compiled.compiled, variant?.subject ?? compiled.template.subject, context);
+        const email: RenderedEmail = await renderEmail(compiled.compiled, send.subject ?? variant?.subject ?? compiled.template.subject, context);
         let html: string = email.html;
         if (campaign.trackClicks) {
             html = trackLinks(html, (url, index) => `${publicUrl}/api/mail/crm${clickPath(secret, send.token, index, url)}`, new Set([links.unsubscribe, links.preferences])).html;

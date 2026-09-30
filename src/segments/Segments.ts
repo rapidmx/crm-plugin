@@ -7,6 +7,7 @@ import { FilterField, FilterNode, compileFilter, filterFields, validateFilter } 
 import { CONTACT_FIELDS } from "../filters/fields.js";
 import type { CrmModelClasses, CrmRepos } from "../models/CrmModelClasses.js";
 import { CrmContact, CrmObjectType, PropertyDefinition, PropertyValue, Segment } from "../models/types.js";
+import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
 
 /** The `PropertyValue` key of segment membership: one row per member, `stringValue` = the segment's uid. */
 export const SEGMENTS_KEY = "segments";
@@ -134,6 +135,18 @@ export async function refreshSegment(repos: CrmRepos, classes: CrmModelClasses, 
     const { uids, capped } = await matchingContacts(repos, segment.workspaceUid, segment.filter as FilterNode);
     const { entered, left } = await syncMembers(repos, classes, segment, uids);
     return { counts: { memberCount: uids.length, capped, refreshedAt: new Date() }, entered, left };
+}
+
+/** Records `segment.entered` and `segment.left` events for who entered and left `segment`. */
+export async function recordSegmentEvents(repos: CrmRepos, classes: CrmModelClasses, segment: Segment, entered: string[], left: string[], logger?: any): Promise<void> {
+    for (const [type, contactUids] of [
+        [CrmEventType.SEGMENT_ENTERED, entered],
+        [CrmEventType.SEGMENT_LEFT, left],
+    ] as const) {
+        for (const contactUid of contactUids) {
+            await recordCrmEvent(repos, classes, { workspaceUid: segment.workspaceUid, type, contactUid, data: { segmentUid: segment.uid } }, logger);
+        }
+    }
 }
 
 /** Which of `contactUids` are in at least one of `segmentUids`. */

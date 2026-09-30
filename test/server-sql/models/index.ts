@@ -25,3 +25,7 @@ export { OutboundSendSQL } from "../../../src/models/sql/OutboundSendSQL.js";
 export { EngagementEventSQL } from "../../../src/models/sql/EngagementEventSQL.js";
 export { SegmentSQL } from "../../../src/models/sql/SegmentSQL.js";
 export { ScoringRuleSQL } from "../../../src/models/sql/ScoringRuleSQL.js";
+export { AutomationSQL } from "../../../src/models/sql/AutomationSQL.js";
+export { AutomationVersionSQL } from "../../../src/models/sql/AutomationVersionSQL.js";
+export { EnrollmentSQL } from "../../../src/models/sql/EnrollmentSQL.js";
+export { CrmEventSQL } from "../../../src/models/sql/CrmEventSQL.js";

@@ -59,7 +59,18 @@ This first release covers the CRM core:
     unsubscribed, optionally within the last N days and up to a limit.
   - Scores update in the background, or on demand.
 
-Automations and sales pipelines follow in later releases.
+- **Automations**: workflows that react to what contacts do.
+  - **Triggers:** subscribing or unsubscribing, submitting a form, entering or leaving a segment, being created or changed,
+    opening, clicking, replying to or bouncing an email, or being put in by hand. A trigger can also take a contact filter.
+  - **Steps:** waiting a while; waiting for an earlier email to be opened, clicked or replied to (with a timeout, and a branch
+    for each outcome); if/else on a contact filter; random splits; sending an email; setting a field; adding or removing a tag;
+    subscribing or unsubscribing; creating a task; notifying a member; putting the contact into another automation; ending.
+  - **Editing:** a branching editor with ready-made starting points ("welcome, then follow up if there's no reply", welcome
+    series, form follow-up, win back). A publish checks the whole flow first.
+  - **Running:** contacts go through the version they entered. A goal takes them out early, and a re-entry rule decides whether
+    they can go through again. Each step shows live numbers, and every contact's run can be looked at or stopped.
+
+Sales pipelines follow in a later release.
 
 ## Installing
 
@@ -90,6 +101,8 @@ Replies, bounces and complaints are learned from restapi's mail event stream, so
 | `mail:crm:jobs:events:schedule` | `*/2 * * * * *` | How often the mail event stream is read. |
 | `mail:crm:jobs:segments:schedule`, `...:refresh_seconds`, `...:batch` | `0 * * * * *`, `300`, `20` | How dynamic segments are kept current. |
 | `mail:crm:jobs:scoring:schedule`, `...:interval_seconds`, `...:batch` | `30 * * * * *`, `3600`, `5` | How lead scores are kept current. |
+| `mail:crm:jobs:triggers:schedule`, `...:batch`, `...:retention_days` | `*/5 * * * * *`, `200`, `30` | How contact events are handed to automations, and how long they are kept. |
+| `mail:crm:jobs:automations:schedule`, `...:batch`, `...:lease_seconds`, `...:paused_retry_seconds` | `*/5 * * * * *`, `100`, `120`, `60` | How contacts are moved through automations. |
 
 ## API
 
@@ -111,6 +124,7 @@ A deployment administrator has no access to a workspace they aren't a member of.
 | `campaigns` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/audience`, `GET /:workspaceUid/:uid/checklist`, `POST /:workspaceUid/:uid/schedule` (`{ sendAt? }`), `POST /:workspaceUid/:uid/unschedule\|pause\|resume\|cancel\|duplicate`, `GET /:workspaceUid/:uid/report`, `POST /:workspaceUid/:uid/recipients` |
 | `segments` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/preview` (`{ filter }`), `POST /:workspaceUid/:uid/refresh` |
 | `scoring-rules` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` (admins), `POST /:workspaceUid/recalculate` |
+| `automations` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/:uid/publish\|pause\|resume`, `POST /:workspaceUid/:uid/enroll` (`{ contactUids }`), `GET /:workspaceUid/:uid/report`, `POST /:workspaceUid/:uid/enrollments`, `POST /:workspaceUid/:uid/enrollments/:enrollmentUid/exit` |
 | `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `GET/POST /unsubscribe/:token` |
 | `t` (anonymous) | `GET /o/:token` (open image), `GET /c/:token/:index?u=&s=` (tracked link) |
 

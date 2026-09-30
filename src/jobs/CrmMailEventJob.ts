@@ -200,10 +200,9 @@ export abstract class CrmMailEventJob extends CrmJobBase {
 
     /** Whether `send` went out from a sender whose mailbox is `mailboxUid`. */
     private async sentFrom(send: OutboundSend, mailboxUid: string): Promise<boolean> {
-        const campaign: any = await (await this.repo("campaign")).findOne(send.sourceUid, { ignoreACL: true });
-        const sender: WorkspaceSender | undefined = campaign?.senderUid
-            ? await (await this.repo<WorkspaceSender>("workspaceSender")).findOne(campaign.senderUid, { ignoreACL: true })
-            : undefined;
+        const campaign: any = send.senderUid ? undefined : await (await this.repo("campaign")).findOne(send.sourceUid, { ignoreACL: true });
+        const senderUid: string | undefined = send.senderUid ?? campaign?.senderUid;
+        const sender: WorkspaceSender | undefined = senderUid ? await (await this.repo<WorkspaceSender>("workspaceSender")).findOne(senderUid, { ignoreACL: true }) : undefined;
         return sender?.mailboxUid === mailboxUid;
     }
 

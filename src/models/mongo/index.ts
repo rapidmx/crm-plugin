@@ -4,9 +4,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 import { MailboxMongo } from "@rapidmx/restapi/mongo";
 import type { CrmModelClasses } from "../CrmModelClasses.js";
+import { AutomationMongo } from "./AutomationMongo.js";
+import { AutomationVersionMongo } from "./AutomationVersionMongo.js";
 import { CampaignMongo } from "./CampaignMongo.js";
 import { CrmCompanyMongo } from "./CrmCompanyMongo.js";
 import { CrmContactMongo } from "./CrmContactMongo.js";
+import { CrmEventMongo } from "./CrmEventMongo.js";
 import { CrmFormMongo } from "./CrmFormMongo.js";
 import { CrmImportMongo } from "./CrmImportMongo.js";
 import { CrmNoteMongo } from "./CrmNoteMongo.js";
@@ -14,6 +17,7 @@ import { CrmSettingMongo } from "./CrmSettingMongo.js";
 import { CrmTaskMongo } from "./CrmTaskMongo.js";
 import { EmailTemplateMongo } from "./EmailTemplateMongo.js";
 import { EngagementEventMongo } from "./EngagementEventMongo.js";
+import { EnrollmentMongo } from "./EnrollmentMongo.js";
 import { MailingListMongo } from "./MailingListMongo.js";
 import { OutboundSendMongo } from "./OutboundSendMongo.js";
 import { PropertyDefinitionMongo } from "./PropertyDefinitionMongo.js";
@@ -53,5 +57,9 @@ export const MONGO_MODELS: CrmModelClasses = {
     engagementEvent: EngagementEventMongo,
     segment: SegmentMongo,
     scoringRule: ScoringRuleMongo,
+    automation: AutomationMongo,
+    automationVersion: AutomationVersionMongo,
+    enrollment: EnrollmentMongo,
+    crmEvent: CrmEventMongo,
     mailbox: MailboxMongo,
 };
