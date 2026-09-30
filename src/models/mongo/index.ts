@@ -11,9 +11,11 @@ import { CrmImportMongo } from "./CrmImportMongo.js";
 import { CrmNoteMongo } from "./CrmNoteMongo.js";
 import { CrmSettingMongo } from "./CrmSettingMongo.js";
 import { CrmTaskMongo } from "./CrmTaskMongo.js";
+import { EmailTemplateMongo } from "./EmailTemplateMongo.js";
 import { MailingListMongo } from "./MailingListMongo.js";
 import { PropertyDefinitionMongo } from "./PropertyDefinitionMongo.js";
 import { PropertyValueMongo } from "./PropertyValueMongo.js";
+import { SavedBlockMongo } from "./SavedBlockMongo.js";
 import { SubscriptionMongo } from "./SubscriptionMongo.js";
 import { SuppressionMongo } from "./SuppressionMongo.js";
 import { TimelineEventMongo } from "./TimelineEventMongo.js";
@@ -39,5 +41,7 @@ export const MONGO_MODELS: CrmModelClasses = {
     suppression: SuppressionMongo,
     form: CrmFormMongo,
     setting: CrmSettingMongo,
+    template: EmailTemplateMongo,
+    savedBlock: SavedBlockMongo,
     mailbox: MailboxMongo,
 };

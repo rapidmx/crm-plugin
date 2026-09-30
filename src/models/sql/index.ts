@@ -11,9 +11,11 @@ import { CrmImportSQL } from "./CrmImportSQL.js";
 import { CrmNoteSQL } from "./CrmNoteSQL.js";
 import { CrmSettingSQL } from "./CrmSettingSQL.js";
 import { CrmTaskSQL } from "./CrmTaskSQL.js";
+import { EmailTemplateSQL } from "./EmailTemplateSQL.js";
 import { MailingListSQL } from "./MailingListSQL.js";
 import { PropertyDefinitionSQL } from "./PropertyDefinitionSQL.js";
 import { PropertyValueSQL } from "./PropertyValueSQL.js";
+import { SavedBlockSQL } from "./SavedBlockSQL.js";
 import { SubscriptionSQL } from "./SubscriptionSQL.js";
 import { SuppressionSQL } from "./SuppressionSQL.js";
 import { TimelineEventSQL } from "./TimelineEventSQL.js";
@@ -39,5 +41,7 @@ export const SQL_MODELS: CrmModelClasses = {
     suppression: SuppressionSQL,
     form: CrmFormSQL,
     setting: CrmSettingSQL,
+    template: EmailTemplateSQL,
+    savedBlock: SavedBlockSQL,
     mailbox: MailboxSQL,
 };

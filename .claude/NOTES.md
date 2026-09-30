@@ -97,6 +97,32 @@ Keep entries terse — this is a reference, not a transcript.
 - **Forms**: anonymous submissions go through the contact route's `importRow()` (as imports do) but only fill fields/properties an
   existing contact doesn't have; honeypot field `website`; per-IP rate limit on every public endpoint (`RateLimiter`, key
   `crm-<kind>|<ip/64>`). Links in emails use `mail:crm:public_url` (manifest default `https://<host>`), never the request's Host.
+- **Templates** (`src/templates/`) are rendered in four steps:
+  1. **Design JSON** is checked by `validateDesign()`.
+     - Every block's text or HTML goes through `sanitizeText()` or `sanitizeBlockHtml()`, which use sanitize-html and then restore
+       the quotes inside `{{ }}`/`{% %}` so Liquid can parse them.
+     - A link with an unsafe target becomes a `<span>`.
+     - A link field may hold simple merge tags anywhere; in the check, each one counts as `{}`.
+  2. **`designToMjml()`**, then **mjml 5** (async). The output keeps the merge tags.
+  3. **Liquid**. The body engine uses `outputEscape: "escape"` and `ownPropertyOnly`, with parse, render and memory limits; the
+     subject engine has no escaping.
+  4. **html-to-text** produces the text part.
+
+  On save, a template is compiled and its tags are parsed (`checkMergeTags`), so a template that can't be sent is refused at once.
+- **HTML blocks** may only be added or changed by admins (`canManage`). An editor may keep an admin's block unchanged; the check
+  compares it by block id with the saved design.
+- **Merge context.** Keys are snake_case (`contact.first_name`, `company.properties.<key>`, `workspace.postal_address`, `links.*`).
+  `CrmRouteBase.mergeContextFor()` builds it for a contact, or for a made-up reader when no contact is given.
+- **Test sends.** A test goes only to the primary address of a mailbox the caller can READ (`hasMailAccess`), so it can't be used to
+  mail strangers.
+- **Designer UI** (`apps/shared/components/designer/`):
+  - `designModel.ts` holds pure edit functions plus the undo history.
+  - Edits that share a merge key (typing in one field or block) are undone together.
+  - The canvas uses `@dnd-kit/sortable`, one `SortableContext` per column, with columns as droppables. Blocks can also be moved with
+    their up/down buttons.
+  - Text blocks are edited inline with TipTap (`LazyTextBlockEditor`, loaded client-only).
+  - HTML blocks show as code on the canvas. Only the sandboxed preview iframe draws arbitrary HTML.
+  - Save sends `version`, so a stale save answers 409.
 
 ## Session Log
 
@@ -122,3 +148,16 @@ Keep entries terse — this is a reference, not a transcript.
   mailbox's uid is its address); routes cache the token key, so tests that clear `CrmSetting` reset `cachedTokenSecret`.
 - Unverified: whether the server's headers let `/f/<form>` be framed by another site (the embed code is an iframe). If framing is
   refused, the "Open form" link still works.
+
+### 2026-09-29 — Phase 3: templates and the designer
+
+- **New models:** `EmailTemplate` and `SavedBlock`.
+- **New routes:** `templates` (CRUD plus merge-tags, render, test and duplicate) and `saved-blocks`.
+- **New pages:** `/crm/templates` and `/crm/templates/<uid>`.
+- **New dependencies:**
+  - runtime: `mjml`, `liquidjs`, `html-to-text`, `sanitize-html` and `@dnd-kit/sortable`;
+  - peer: `@tiptap/*` and `@dnd-kit/core`, the server's copies.
+- **Bug fixed while testing:** the designer's undo merging read its ref inside a state updater, so the first keystroke was never
+  recorded. The merge decision is now made before `setHistory`.
+- **UX fix:** number fields no longer clamp while you type, so "200" can be typed without it turning into 16.
+- **Flaky test fixed:** a Phase 2 test ("Awaiting confirmation") raced the list load. It now waits for the text.

@@ -46,6 +46,8 @@ const MODELS: [string, string, string, string[], boolean][] = [
     ["Suppression", "suppression", "CrmSuppression", ["crm_suppression_workspace_email"], false],
     ["CrmForm", "crm_form", "CrmForm", ["crm_form_workspace"], false],
     ["CrmSetting", "crm_setting", "CrmSetting", ["crm_setting_key"], false],
+    ["EmailTemplate", "email_template", "CrmEmailTemplate", ["crm_template_workspace_name"], false],
+    ["SavedBlock", "saved_block", "CrmSavedBlock", ["crm_savedblock_workspace"], false],
 ];
 
 const ROUTES: [string, string][] = [
@@ -62,6 +64,8 @@ const ROUTES: [string, string][] = [
     ["Suppression", "suppressions"],
     ["Form", "forms"],
     ["Public", "public"],
+    ["Template", "templates"],
+    ["SavedBlock", "saved-blocks"],
 ];
 
 describe("plugin entry points", () => {

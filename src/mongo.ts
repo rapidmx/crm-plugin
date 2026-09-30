@@ -23,6 +23,8 @@ export { SubscriptionMongo } from "./models/mongo/SubscriptionMongo.js";
 export { SuppressionMongo } from "./models/mongo/SuppressionMongo.js";
 export { CrmFormMongo } from "./models/mongo/CrmFormMongo.js";
 export { CrmSettingMongo } from "./models/mongo/CrmSettingMongo.js";
+export { EmailTemplateMongo } from "./models/mongo/EmailTemplateMongo.js";
+export { SavedBlockMongo } from "./models/mongo/SavedBlockMongo.js";
 export { WorkspaceRouteMongo } from "./routes/mongo/WorkspaceRouteMongo.js";
 export { ContactRouteMongo } from "./routes/mongo/ContactRouteMongo.js";
 export { CompanyRouteMongo } from "./routes/mongo/CompanyRouteMongo.js";
@@ -36,4 +38,6 @@ export { SubscriptionRouteMongo } from "./routes/mongo/SubscriptionRouteMongo.js
 export { SuppressionRouteMongo } from "./routes/mongo/SuppressionRouteMongo.js";
 export { FormRouteMongo } from "./routes/mongo/FormRouteMongo.js";
 export { PublicRouteMongo } from "./routes/mongo/PublicRouteMongo.js";
+export { TemplateRouteMongo } from "./routes/mongo/TemplateRouteMongo.js";
+export { SavedBlockRouteMongo } from "./routes/mongo/SavedBlockRouteMongo.js";
 export { CrmImportJobMongo } from "./jobs/mongo/CrmImportJobMongo.js";

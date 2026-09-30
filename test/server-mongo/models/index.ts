@@ -18,3 +18,5 @@ export { SubscriptionMongo } from "../../../src/models/mongo/SubscriptionMongo.j
 export { SuppressionMongo } from "../../../src/models/mongo/SuppressionMongo.js";
 export { CrmFormMongo } from "../../../src/models/mongo/CrmFormMongo.js";
 export { CrmSettingMongo } from "../../../src/models/mongo/CrmSettingMongo.js";
+export { EmailTemplateMongo } from "../../../src/models/mongo/EmailTemplateMongo.js";
+export { SavedBlockMongo } from "../../../src/models/mongo/SavedBlockMongo.js";

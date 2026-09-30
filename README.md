@@ -19,8 +19,18 @@ This first release covers the CRM core:
 - **A preference center** at `/subscriptions/<token>` where a subscriber chooses their lists or unsubscribes from all email, and
   **one-click unsubscribe** links (RFC 8058) - no account needed, the links carry signed tokens.
 - **A suppression list** of addresses never to email.
+- **Email templates** built in a **drag-and-drop designer**. It offers:
+  - sections of up to four columns;
+  - heading, text, image, button, divider, spacer, social, footer and hand-written HTML blocks;
+  - inline text editing and a theme;
+  - merge tags such as `{{ contact.first_name }}` and custom properties;
+  - undo and redo, and reusable saved blocks;
+  - a preview for a sample reader or any contact, at desktop or phone width or as plain text;
+  - test sends.
 
-Campaigns, templates, engagement tracking, automations and sales pipelines follow in later releases.
+  Templates are laid out with MJML and filled in with Liquid; merged values are HTML-escaped.
+
+Campaigns, engagement tracking, automations and sales pipelines follow in later releases.
 
 ## Installing
 
@@ -58,12 +68,22 @@ A deployment administrator has no access to a workspace they aren't a member of.
 | `imports` | `GET /:workspaceUid`, `POST /:workspaceUid?objectType=&fileName=` (raw CSV body), `POST /:workspaceUid/:uid/start`, `GET/DELETE /:workspaceUid/:uid` |
 | `lists`, `suppressions`, `forms` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
 | `subscriptions` | `GET /:workspaceUid?listUid=&contactUid=&status=`, `POST /:workspaceUid` (`{ listUid, contactUids, status }`) |
+| `templates` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `GET /:workspaceUid/merge-tags`, `POST /:workspaceUid/render`, `POST /:workspaceUid/:uid/test`, `POST /:workspaceUid/:uid/duplicate` |
+| `saved-blocks` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
 | `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `POST /unsubscribe/:token` |
 
 A search takes `{ filter, q, sort: { field, direction }, limit, page }` and answers `{ items, total }`. A filter is a condition
 `{ field, op, value }` or a group `{ and: [...] }` / `{ or: [...] }`. Fields are a record's own fields, `tags`, or
 `properties.<key>`. The comparisons are `eq`, `ne`, `contains`, `notContains`, `startsWith`, `gt`, `gte`, `lt`, `lte`, `between`,
 `in`, `notIn`, `isSet` and `isNotSet`, each allowed on the types it makes sense for.
+
+A template's `design` is `{ theme, sections: [{ columns: [{ blocks: [...] }] }] }`. It is checked and sanitized on every save:
+- Text is limited to what the editor produces.
+- Links must be web, mail, phone or merge-tag links, and images must use `https://`.
+- HTML blocks may only be added or changed by workspace admins. Scripts, frames and forms are removed from them.
+- A design that can't be laid out, or that has a broken merge tag, is refused.
+
+`POST /render` returns `{ subject, html, text }`. A test is sent only to the address of a mailbox the caller can read.
 
 ## Development
 

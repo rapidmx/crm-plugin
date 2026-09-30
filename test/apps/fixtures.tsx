@@ -77,8 +77,55 @@ export function stubBasics(api: any, overrides: { workspaces?: any[] } = {}): vo
     api.listSubscriptions.mockResolvedValue([]);
     api.listForms.mockResolvedValue([]);
     api.listSuppressions.mockResolvedValue([]);
+    api.searchTemplates.mockResolvedValue({ items: [], total: 0 });
+    api.listMergeTags.mockResolvedValue([]);
+    api.listSavedBlocks.mockResolvedValue([]);
 }
 
 export function list(overrides: Record<string, unknown> = {}): any {
     return { uid: "l1", name: "Newsletter", publicName: "News", doubleOptIn: false, visible: true, subscribedCount: 3, pendingCount: 1, ...stored, ...overrides };
+}
+
+export function emailTemplate(overrides: Record<string, unknown> = {}): any {
+    return {
+        uid: "t1",
+        workspaceUid: "w1",
+        name: "Welcome",
+        subject: "Hi {{ contact.first_name }}",
+        preheader: null,
+        category: null,
+        hasUnsubscribeLink: true,
+        design: {
+            version: 1,
+            theme: {
+                width: 600,
+                backgroundColor: "#f3f4f6",
+                contentBackgroundColor: "#ffffff",
+                textColor: "#111827",
+                linkColor: "#2563eb",
+                buttonColor: "#2563eb",
+                buttonTextColor: "#ffffff",
+                fontFamily: "Arial, Helvetica, sans-serif",
+            },
+            sections: [
+                {
+                    id: "s1",
+                    padding: 24,
+                    columns: [
+                        {
+                            id: "c1",
+                            blocks: [
+                                { id: "b-head", type: "heading", text: "Hello", level: 1 },
+                                { id: "b-text", type: "text", html: "<p>Body</p>" },
+                                { id: "b-btn", type: "button", text: "Go", href: "https://acme.example" },
+                            ],
+                        },
+                    ],
+                },
+                { id: "s2", columns: [{ id: "c2", blocks: [{ id: "b-foot", type: "footer" }] }] },
+            ],
+        },
+        ...stored,
+        ...overrides,
+    };
 }

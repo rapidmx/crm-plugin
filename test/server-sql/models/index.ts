@@ -18,3 +18,5 @@ export { SubscriptionSQL } from "../../../src/models/sql/SubscriptionSQL.js";
 export { SuppressionSQL } from "../../../src/models/sql/SuppressionSQL.js";
 export { CrmFormSQL } from "../../../src/models/sql/CrmFormSQL.js";
 export { CrmSettingSQL } from "../../../src/models/sql/CrmSettingSQL.js";
+export { EmailTemplateSQL } from "../../../src/models/sql/EmailTemplateSQL.js";
+export { SavedBlockSQL } from "../../../src/models/sql/SavedBlockSQL.js";

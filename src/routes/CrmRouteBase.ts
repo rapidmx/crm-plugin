@@ -4,11 +4,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 import * as crypto from "crypto";
 import { ObjectDecorators, type JWTUser } from "@rapidrest/core";
+import { stripTrustedRoles } from "@rapidmx/restapi";
 import { ACLUtils, ModelUtils, NotificationUtils, ObjectFactory, RepoUtils } from "@rapidrest/service-core";
 import { CrmModelClasses, CrmModelName, CrmRepos } from "../models/CrmModelClasses.js";
 import {
+    CrmCompany,
+    CrmContact,
     CrmObjectType,
     CrmSetting,
+    PropertyDefinition,
+    Workspace,
     MailingList,
     Subscription,
     SubscriptionStatus,
@@ -18,8 +23,11 @@ import {
     WorkspaceMember,
     WorkspaceSender,
 } from "../models/types.js";
+import { MergeContext, sampleContext } from "../templates/Render.js";
+import { buildMergeContext } from "../templates/MergeContext.js";
+import { readValues } from "../util/PropertyValues.js";
 import { TokenPayload, signToken } from "../util/Tokens.js";
-import { assertWorkspaceAccess } from "../util/WorkspaceAccess.js";
+import { assertWorkspaceAccess, notFound } from "../util/WorkspaceAccess.js";
 import { badRequest } from "../util/Validation.js";
 const { Config, Inject, Logger } = ObjectDecorators;
 
@@ -106,6 +114,64 @@ export abstract class CrmRouteBase {
             throw badRequest(`'${field}' must be a member of the workspace.`);
         }
         return member.userUid;
+    }
+
+    /** Whether the caller may change the workspace's settings (holds `MANAGE`), trusted roles aside. */
+    protected async canManage(user: JWTUser | undefined, workspaceUid: string): Promise<boolean> {
+        return await this.aclUtils!.hasPermission(stripTrustedRoles(user, this.trustedRoles), workspaceUid, WorkspaceAction.MANAGE);
+    }
+
+    /** The workspace `workspaceUid`, or a 404. */
+    protected async requireWorkspaceRecord(workspaceUid: string): Promise<Workspace> {
+        const workspace: Workspace | undefined = await (await this.repo<Workspace>("workspace")).findOne(workspaceUid, { ignoreACL: true });
+        // Callers check access first, which already 404s for a missing workspace.
+        /* v8 ignore if */
+        if (!workspace) {
+            throw notFound();
+        }
+        return workspace;
+    }
+
+    /**
+     * The merge context of `contactUid` (a contact of the workspace, else a 400), or of a made-up reader when it is undefined - with the
+     * sender and links given (links default to placeholders, for previews).
+     */
+    protected async mergeContextFor(
+        workspace: Workspace,
+        contactUid: unknown,
+        sender?: WorkspaceSender,
+        links: MergeContext["links"] = { unsubscribe: "#unsubscribe", preferences: "#preferences" },
+    ): Promise<MergeContext> {
+        const workspaceView = { name: workspace.name, postal_address: workspace.postalAddress ?? undefined, website: workspace.website ?? undefined };
+        if (contactUid === undefined || contactUid === null || contactUid === "") {
+            return { ...sampleContext(workspaceView, sender ? { name: sender.fromName, address: sender.fromAddress } : undefined), links };
+        }
+        const contact: CrmContact | undefined =
+            typeof contactUid === "string" && contactUid.length <= 64
+                ? await (await this.repo<CrmContact>("contact")).findOne(contactUid, { ignoreACL: true, skipCache: true })
+                : undefined;
+        if (!contact || contact.workspaceUid !== workspace.uid) {
+            throw badRequest("'contactUid' must be a contact of the workspace.");
+        }
+        const company: CrmCompany | undefined = contact.companyUid
+            ? await (await this.repo<CrmCompany>("company")).findOne(contact.companyUid, { ignoreACL: true, skipCache: true })
+            : undefined;
+        const values = await readValues(await this.repo("propertyValue"), company ? [contact.uid, company.uid] : [contact.uid]);
+        const definitions: PropertyDefinition[] = await (await this.repo<PropertyDefinition>("propertyDefinition")).find(
+            { workspaceUid: ModelUtils.literal(workspace.uid) },
+            { ignoreACL: true, limit: 1000, skipCache: true },
+        );
+        return buildMergeContext({
+            workspace,
+            contact,
+            contactValues: values.get(contact.uid),
+            contactDefinitions: definitions.filter((definition) => definition.objectType === CrmObjectType.CONTACT),
+            company,
+            companyValues: company ? values.get(company.uid) : undefined,
+            companyDefinitions: definitions.filter((definition) => definition.objectType === CrmObjectType.COMPANY),
+            sender,
+            links,
+        });
     }
 
     /** Refuses (400) a `subjectType`/`subjectUid` pair that isn't a contact or company of `workspaceUid`. */

@@ -131,6 +131,39 @@ describe("crmApi", () => {
         expect(api.recordPath("company")).toBe("companies");
     });
 
+    it("calls each template and saved block endpoint", async () => {
+        const calls = recordCalls(() => jsonResponse(200, {}));
+        const design = { theme: {} as any, sections: [] };
+        await api.searchTemplates("w", 2);
+        await api.searchTemplates("w", 0, 10);
+        await api.getTemplate("w", "t");
+        await api.createTemplate("w", { name: "T", subject: "S" });
+        await api.updateTemplate("w", "t", { name: "U", version: 3 });
+        await api.deleteTemplate("w", "t");
+        await api.duplicateTemplate("w", "t");
+        await api.renderTemplate("w", { design, subject: "S" });
+        await api.sendTestTemplate("w", "t", { to: "a@x.example", senderUid: "s" });
+        await api.listMergeTags("w");
+        await api.listSavedBlocks("w");
+        await api.createSavedBlock("w", { name: "B", blocks: [] });
+        await api.deleteSavedBlock("w", "b");
+        expect(calls).toEqual([
+            'POST /api/mail/crm/templates/w/search {"sort":{"field":"name","direction":"asc"},"limit":100,"page":2}',
+            'POST /api/mail/crm/templates/w/search {"sort":{"field":"name","direction":"asc"},"limit":10,"page":0}',
+            "GET /api/mail/crm/templates/w/t",
+            'POST /api/mail/crm/templates/w {"name":"T","subject":"S"}',
+            'PUT /api/mail/crm/templates/w/t {"name":"U","version":3}',
+            "DELETE /api/mail/crm/templates/w/t",
+            "POST /api/mail/crm/templates/w/t/duplicate {}",
+            'POST /api/mail/crm/templates/w/render {"design":{"theme":{},"sections":[]},"subject":"S"}',
+            'POST /api/mail/crm/templates/w/t/test {"to":"a@x.example","senderUid":"s"}',
+            "GET /api/mail/crm/templates/w/merge-tags",
+            "GET /api/mail/crm/saved-blocks/w?limit=200",
+            'POST /api/mail/crm/saved-blocks/w {"name":"B","blocks":[]}',
+            "DELETE /api/mail/crm/saved-blocks/w/b",
+        ]);
+    });
+
     it("uploads a CSV file as the raw body and reads the answer", async () => {
         const fetchMock = mockFetch(() => jsonResponse(200, { import: { uid: "i" }, targets: [], preview: [] }));
         const file = new File(["email\na@x.example"], "people list.csv", { type: "text/csv" });

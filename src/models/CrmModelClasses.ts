@@ -25,6 +25,8 @@ export interface CrmModelClasses {
     suppression: any;
     form: any;
     setting: any;
+    template: any;
+    savedBlock: any;
     /** `@rapidmx/restapi`'s `Mailbox`. */
     mailbox: any;
 }

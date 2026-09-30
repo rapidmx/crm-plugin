@@ -419,3 +419,24 @@ export interface CrmSetting extends CrmEntity {
     key: string;
     value: string;
 }
+
+/** An email template: a design (sections of blocks, rendered with MJML) with a subject and preview line, both able to hold merge tags. */
+export interface EmailTemplate extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    /** A free-form grouping: `newsletter`, `welcome`, `transactional`... */
+    category?: string;
+    subject: string;
+    /** The line inboxes show after the subject. */
+    preheader?: string;
+    /** The design - see `templates/Design.ts`'s `TemplateDesign`. */
+    design: unknown;
+}
+
+/** A block (or several) saved to be reused in other templates. */
+export interface SavedBlock extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    /** The saved blocks - see `templates/Design.ts`'s `DesignBlock`. */
+    blocks: unknown[];
+}

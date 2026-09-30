@@ -9,6 +9,7 @@ import { CrmTestContext } from "./context.js";
 import { edgeSuite } from "./edgeSuite.js";
 import { importSuite } from "./importSuite.js";
 import { listSuite } from "./listSuite.js";
+import { templateSuite } from "./templateSuite.js";
 import { workspaceSuite } from "./workspaceSuite.js";
 
 export function runCrmSuites(ctx: CrmTestContext): void {
@@ -18,4 +19,5 @@ export function runCrmSuites(ctx: CrmTestContext): void {
     importSuite(ctx);
     edgeSuite(ctx);
     listSuite(ctx);
+    templateSuite(ctx);
 }

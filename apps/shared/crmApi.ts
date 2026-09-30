@@ -393,3 +393,145 @@ async function responseError(response: Response): Promise<ApiRequestError> {
 export function errorMessage(err: unknown, fallback: string): string {
     return err instanceof ApiRequestError ? err.message : fallback;
 }
+
+// Templates
+
+export type Align = "left" | "center" | "right";
+export type SocialNetwork = "facebook" | "x" | "linkedin" | "instagram" | "youtube" | "github" | "web";
+
+interface BlockBase {
+    id: string;
+    align?: Align;
+    padding?: number;
+}
+export interface TextBlock extends BlockBase {
+    type: "text";
+    html: string;
+    color?: string;
+    fontSize?: number;
+}
+export interface HeadingBlock extends BlockBase {
+    type: "heading";
+    text: string;
+    level: 1 | 2 | 3;
+    color?: string;
+}
+export interface ImageBlock extends BlockBase {
+    type: "image";
+    src: string;
+    alt: string;
+    href?: string;
+    width?: number;
+}
+export interface ButtonBlock extends BlockBase {
+    type: "button";
+    text: string;
+    href: string;
+    color?: string;
+    backgroundColor?: string;
+    borderRadius?: number;
+}
+export interface DividerBlock extends BlockBase {
+    type: "divider";
+    color?: string;
+    thickness?: number;
+}
+export interface SpacerBlock extends BlockBase {
+    type: "spacer";
+    height: number;
+}
+export interface SocialBlock extends BlockBase {
+    type: "social";
+    links: { network: SocialNetwork; href: string }[];
+}
+export interface HtmlBlock extends BlockBase {
+    type: "html";
+    html: string;
+}
+export interface FooterBlock extends BlockBase {
+    type: "footer";
+    note?: string;
+    color?: string;
+}
+export type DesignBlock = TextBlock | HeadingBlock | ImageBlock | ButtonBlock | DividerBlock | SpacerBlock | SocialBlock | HtmlBlock | FooterBlock;
+export type BlockType = DesignBlock["type"];
+
+export interface DesignColumn {
+    id: string;
+    blocks: DesignBlock[];
+}
+export interface DesignSection {
+    id: string;
+    columns: DesignColumn[];
+    backgroundColor?: string;
+    padding?: number;
+}
+export interface DesignTheme {
+    width: number;
+    backgroundColor: string;
+    contentBackgroundColor: string;
+    textColor: string;
+    linkColor: string;
+    buttonColor: string;
+    buttonTextColor: string;
+    fontFamily: string;
+}
+export interface TemplateDesign {
+    version?: number;
+    theme: DesignTheme;
+    sections: DesignSection[];
+}
+
+export interface EmailTemplate extends Stored {
+    workspaceUid: string;
+    name: string;
+    category?: string | null;
+    subject: string;
+    preheader?: string | null;
+    design: TemplateDesign;
+    /** The design has an unsubscribe link (a footer block, or a `{{ links.unsubscribe }}` link); campaigns require one. */
+    hasUnsubscribeLink: boolean;
+}
+
+export interface SavedBlock extends Stored {
+    workspaceUid: string;
+    name: string;
+    blocks: DesignBlock[];
+}
+
+export interface RenderedEmail {
+    subject: string;
+    html: string;
+    text: string;
+}
+
+export interface MergeTag {
+    tag: string;
+    label: string;
+}
+
+/** A template's changes; `version` refuses the change when the template was saved elsewhere since. */
+export type TemplateInput = Partial<Pick<EmailTemplate, "name" | "category" | "subject" | "preheader" | "design" | "version">>;
+
+/** A page of the workspace's templates, by name. */
+export const searchTemplates = (workspaceUid: string, page: number, limit: number = 100): Promise<SearchResult<EmailTemplate>> =>
+    apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/search`, json("POST", { sort: { field: "name", direction: "asc" }, limit, page }));
+export const getTemplate = (workspaceUid: string, uid: string): Promise<EmailTemplate> => apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/${enc(uid)}`);
+export const createTemplate = (workspaceUid: string, input: TemplateInput): Promise<EmailTemplate> =>
+    apiFetch(`/mail/crm/templates/${enc(workspaceUid)}`, json("POST", input));
+export const updateTemplate = (workspaceUid: string, uid: string, input: TemplateInput): Promise<EmailTemplate> =>
+    apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteTemplate = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+export const duplicateTemplate = (workspaceUid: string, uid: string): Promise<EmailTemplate> =>
+    apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/${enc(uid)}/duplicate`, json("POST", {}));
+export const renderTemplate = (
+    workspaceUid: string,
+    input: { design: TemplateDesign; subject: string; preheader?: string; contactUid?: string },
+): Promise<RenderedEmail> => apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/render`, json("POST", input));
+export const sendTestTemplate = (workspaceUid: string, uid: string, input: { to: string; senderUid: string; contactUid?: string }): Promise<{ sent: string }> =>
+    apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/${enc(uid)}/test`, json("POST", input));
+export const listMergeTags = (workspaceUid: string): Promise<MergeTag[]> => apiFetch(`/mail/crm/templates/${enc(workspaceUid)}/merge-tags`);
+export const listSavedBlocks = (workspaceUid: string): Promise<SavedBlock[]> => apiFetch(`/mail/crm/saved-blocks/${enc(workspaceUid)}?limit=200`);
+export const createSavedBlock = (workspaceUid: string, input: { name: string; blocks: DesignBlock[] }): Promise<SavedBlock> =>
+    apiFetch(`/mail/crm/saved-blocks/${enc(workspaceUid)}`, json("POST", input));
+export const deleteSavedBlock = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/saved-blocks/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));

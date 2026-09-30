@@ -281,7 +281,7 @@ describe("lists elsewhere in the CRM", () => {
 
         const section = await screen.findByRole("region", { name: "Subscriptions" });
         expect(within(section).getByText("No marketing email is sent to this contact (bounced).")).toBeInTheDocument();
-        expect(within(section).getByText("Awaiting confirmation")).toBeInTheDocument();
+        expect(await within(section).findByText("Awaiting confirmation")).toBeInTheDocument();
         expect(within(section).getByText("Not subscribed")).toBeInTheDocument();
         await userEvent.click(within(section).getByRole("button", { name: "Unsubscribe" }));
         expect(await within(section).findByText("Could not change the subscription.")).toBeInTheDocument();
