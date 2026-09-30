@@ -24,6 +24,8 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
     ...Object.keys(CONTACT_FIELDS),
     ...Object.keys(COMPANY_FIELDS),
     TAGS_KEY,
+    "lists",
+    "company",
     "uid",
     "version",
     "properties",

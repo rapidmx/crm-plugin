@@ -16,6 +16,10 @@ import {
     addMember,
     addSender,
     createProperty,
+    createSuppression,
+    deleteSuppression,
+    listSuppressions,
+    Suppression,
     deleteProperty,
     deleteWorkspace,
     errorMessage,
@@ -58,6 +62,7 @@ export default function WorkspaceSettings() {
             <Members />
             <Senders />
             <Properties />
+            <Suppressions />
             {workspace.role === "owner" && canManage && <DangerZone />}
         </div>
     );
@@ -372,6 +377,73 @@ function Properties() {
                     )}
                     <Button type="submit" variant="secondary" disabled={label.trim() === ""} className="!w-auto">
                         Add property
+                    </Button>
+                </form>
+            )}
+        </section>
+    );
+}
+
+const REASONS: Record<string, string> = { hard_bounce: "bounced", complaint: "marked as spam", manual: "added by hand" };
+
+/** The addresses the workspace never sends marketing mail to. */
+function Suppressions() {
+    const { workspace, canManage } = useCrm();
+    const [entries, setEntries] = useState<Suppression[]>([]);
+    const [email, setEmail] = useState("");
+    const [error, setError] = useState<string | null>(null);
+
+    async function load(): Promise<void> {
+        setEntries(await listSuppressions(workspace.uid));
+    }
+
+    useEffect(() => {
+        load().catch((err) => setError(errorMessage(err, "Could not load the suppression list.")));
+    }, [workspace.uid]);
+
+    async function add(event: FormEvent): Promise<void> {
+        event.preventDefault();
+        try {
+            await createSuppression(workspace.uid, { email });
+            setEmail("");
+            setError(null);
+            await load();
+        } catch (err) {
+            setError(errorMessage(err, "Could not add the address."));
+        }
+    }
+
+    return (
+        <section aria-label="Suppressions" className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Do not email</h2>
+            <p className="text-sm text-text-muted">Addresses no campaign is ever sent to. Bounces and spam complaints are added here on their own.</p>
+            {error && <Alert>{error}</Alert>}
+            <ul className="flex flex-col gap-1">
+                {entries.map((entry) => (
+                    <li key={entry.uid} className="flex items-center gap-3 text-sm">
+                        <span className="flex-1">
+                            {entry.email} <span className="text-text-muted">({REASONS[entry.reason] ?? entry.reason})</span>
+                        </span>
+                        {canManage && (
+                            <button
+                                type="button"
+                                className="text-xs text-text-muted hover:text-danger"
+                                onClick={async () => {
+                                    await deleteSuppression(workspace.uid, entry.uid);
+                                    await load();
+                                }}
+                            >
+                                Remove
+                            </button>
+                        )}
+                    </li>
+                ))}
+            </ul>
+            {canManage && (
+                <form className="flex flex-wrap gap-2" aria-label="Add suppression" onSubmit={add}>
+                    <input aria-label="Suppressed address" placeholder="someone@example.com" className={`${INPUT_CLASS} !w-72`} value={email} onChange={(event) => setEmail(event.target.value)} />
+                    <Button type="submit" variant="secondary" disabled={email.trim() === ""} className="!w-auto">
+                        Add address
                     </Button>
                 </form>
             )}

@@ -31,6 +31,9 @@
         "react-dom": "19.x",
         "react-icons": "5.x"
     },
+    "dependencies": {
+        "nodemailer": "^10.0.1"
+    },
     "devDependencies": {
         "@rapidmx/restapi": "^0.26.0",
         "@rapidmx/web-client": "^0.26.0",
@@ -44,6 +47,7 @@
         "@testing-library/user-event": "^14.6.7",
         "@types/nconf": "^0.10.7",
         "@types/node": "^26.5.0",
+        "@types/nodemailer": "^8.0.1",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.7",
         "@typescript-eslint/eslint-plugin": "^8.70.0",
@@ -57,6 +61,7 @@
         "globals": "^17.12.0",
         "jsdom": "^30.0.1",
         "lodash-es": "^4.18.1",
+        "mailparser": "^3.9.0",
         "mongodb": "^7.6.0",
         "mongodb-memory-server": "^11.2.0",
         "nconf": "^0.13.0",
@@ -118,9 +123,16 @@
         "plugin": {
             "apiVersion": 1,
             "displayName": "CRM",
-            "description": "Adds a customer relationship management app at /crm: shared workspaces of contacts and companies with custom properties, notes, tasks and an activity timeline, and CSV import and export.",
+            "description": "Adds a customer relationship management app at /crm: shared workspaces of contacts and companies with custom properties, notes, tasks and an activity timeline, mailing lists with signup forms, double opt-in and a subscriber preference center, and CSV import and export.",
             "mailboxScopedData": true,
             "settings": [
+                {
+                    "key": "mail:crm:public_url",
+                    "label": "Public site address",
+                    "type": "string",
+                    "default": "https://<host>",
+                    "help": "The address the CRM's public pages (signup forms, the preference center, unsubscribe links) are served from, for example https://mail.example.com. Links in CRM emails point here."
+                },
                 {
                     "key": "mail:crm:workspace_creator_roles",
                     "label": "Who can create workspaces",
@@ -143,6 +155,18 @@
                         "host": "www",
                         "mount": "/crm",
                         "dir": "apps/crm"
+                    },
+                    {
+                        "id": "subscriptions",
+                        "host": "public",
+                        "mount": "/subscriptions",
+                        "dir": "apps/subscriptions"
+                    },
+                    {
+                        "id": "forms",
+                        "host": "public",
+                        "mount": "/f",
+                        "dir": "apps/f"
                     }
                 ],
                 "appRail": [

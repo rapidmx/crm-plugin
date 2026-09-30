@@ -6,7 +6,16 @@ import { ObjectDecorators } from "@rapidrest/core";
 import { BackgroundService, ModelUtils, NotificationUtils, ObjectFactory, RepoUtils } from "@rapidrest/service-core";
 import type { BlobStore } from "@rapidmx/restapi";
 import { CrmModelClasses, CrmRepos } from "../models/CrmModelClasses.js";
-import { CrmCompany, CrmImport, CrmObjectType, ImportRowError, ImportStatus, MAX_IMPORT_ERRORS, PropertyDefinition } from "../models/types.js";
+import {
+    CrmCompany,
+    CrmImport,
+    CrmObjectType,
+    ImportRowError,
+    ImportStatus,
+    MAX_IMPORT_ERRORS,
+    PropertyDefinition,
+    SubscriptionStatus,
+} from "../models/types.js";
 import type { BaseTaggedRecordRoute } from "../routes/BaseTaggedRecordRoute.js";
 import { detectDelimiter, parseCsv } from "../util/Csv.js";
 import { COMPANY_NAME_TARGET, rowToBody } from "../util/ImportMapping.js";
@@ -157,8 +166,14 @@ export abstract class CrmImportJob extends BackgroundService {
                 if (companyColumn >= 0 && (rows[index][companyColumn] ?? "").trim()) {
                     body.companyUid = await this.companyByName(current, rows[index][companyColumn].trim());
                 }
-                const outcome = await route.importRow(current.workspaceUid, current.createdByUserUid, body, current.updateExisting);
+                const { outcome, uid } = await route.importRow(current.workspaceUid, current.createdByUserUid, body, current.updateExisting);
                 counts[outcome === "created" ? "createdCount" : outcome === "updated" ? "updatedCount" : "skippedCount"]++;
+                if (current.listUid && outcome !== "skipped") {
+                    await route.setSubscription(current.workspaceUid, current.listUid, uid, SubscriptionStatus.SUBSCRIBED, {
+                        source: "import",
+                        actorUserUid: current.createdByUserUid,
+                    });
+                }
             } catch (err: any) {
                 counts.skippedCount++;
                 if (errors.length < MAX_IMPORT_ERRORS) {

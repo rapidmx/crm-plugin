@@ -74,6 +74,19 @@ describe("crmApi", () => {
         await api.getImport("w", "i");
         await api.startImport("w", "i", { mapping: [], updateExisting: true, tags: [] });
         await api.deleteImport("w", "i");
+        await api.listLists("w");
+        await api.createList("w", { name: "L" });
+        await api.updateList("w", "l", { name: "M" });
+        await api.deleteList("w", "l");
+        await api.listSubscriptions("w", "c");
+        await api.setSubscriptions("w", { listUid: "l", contactUids: ["c"], status: "subscribed" });
+        await api.listSuppressions("w");
+        await api.createSuppression("w", { email: "a@x.example" });
+        await api.deleteSuppression("w", "x");
+        await api.listForms("w");
+        await api.createForm("w", { name: "F" });
+        await api.updateForm("w", "f", { name: "G" });
+        await api.deleteForm("w", "f");
         expect(calls).toEqual([
             "DELETE /api/mail/crm/workspaces/w",
             "DELETE /api/mail/crm/workspaces/w/members/u",
@@ -101,6 +114,19 @@ describe("crmApi", () => {
             "GET /api/mail/crm/imports/w/i",
             'POST /api/mail/crm/imports/w/i/start {"mapping":[],"updateExisting":true,"tags":[]}',
             "DELETE /api/mail/crm/imports/w/i",
+            "GET /api/mail/crm/lists/w?limit=200",
+            'POST /api/mail/crm/lists/w {"name":"L"}',
+            'PUT /api/mail/crm/lists/w/l {"name":"M"}',
+            "DELETE /api/mail/crm/lists/w/l",
+            "GET /api/mail/crm/subscriptions/w?limit=500&contactUid=c",
+            'POST /api/mail/crm/subscriptions/w {"listUid":"l","contactUids":["c"],"status":"subscribed"}',
+            "GET /api/mail/crm/suppressions/w?limit=200",
+            'POST /api/mail/crm/suppressions/w {"email":"a@x.example"}',
+            "DELETE /api/mail/crm/suppressions/w/x",
+            "GET /api/mail/crm/forms/w?limit=200",
+            'POST /api/mail/crm/forms/w {"name":"F"}',
+            'PUT /api/mail/crm/forms/w/f {"name":"G"}',
+            "DELETE /api/mail/crm/forms/w/f",
         ]);
         expect(api.recordPath("company")).toBe("companies");
     });

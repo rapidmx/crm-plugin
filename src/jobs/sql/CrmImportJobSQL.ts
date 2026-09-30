@@ -4,11 +4,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 import type { CrmModelClasses } from "../../models/CrmModelClasses.js";
 import { SQL_MODELS } from "../../models/sql/index.js";
-import { CompanyRouteSQL } from "../../routes/sql/CompanyRouteSQL.js";
 import { ContactRouteSQL } from "../../routes/sql/ContactRouteSQL.js";
+import { CompanyRouteSQL } from "../../routes/sql/CompanyRouteSQL.js";
 import { CrmImportJob } from "../CrmImportJob.js";
 
-/** Imports queued CSV imports on a SQL deployment - see `CrmImportJob`. */
+/** `CrmImportJob` on a SQL deployment. */
 export class CrmImportJobSQL extends CrmImportJob {
     protected classes: CrmModelClasses = SQL_MODELS;
     protected contactRouteClass: any = ContactRouteSQL;

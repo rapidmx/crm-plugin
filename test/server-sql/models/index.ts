@@ -13,3 +13,8 @@ export { CrmNoteSQL } from "../../../src/models/sql/CrmNoteSQL.js";
 export { CrmTaskSQL } from "../../../src/models/sql/CrmTaskSQL.js";
 export { TimelineEventSQL } from "../../../src/models/sql/TimelineEventSQL.js";
 export { CrmImportSQL } from "../../../src/models/sql/CrmImportSQL.js";
+export { MailingListSQL } from "../../../src/models/sql/MailingListSQL.js";
+export { SubscriptionSQL } from "../../../src/models/sql/SubscriptionSQL.js";
+export { SuppressionSQL } from "../../../src/models/sql/SuppressionSQL.js";
+export { CrmFormSQL } from "../../../src/models/sql/CrmFormSQL.js";
+export { CrmSettingSQL } from "../../../src/models/sql/CrmSettingSQL.js";

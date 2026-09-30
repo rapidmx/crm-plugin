@@ -41,6 +41,11 @@ const MODELS: [string, string, string, string[], boolean][] = [
     ["CrmTask", "crm_task", "CrmTask", ["crm_task_workspace_status_due", "crm_task_workspace_assignee", "crm_task_subject"], false],
     ["TimelineEvent", "timeline_event", "CrmTimelineEvent", ["crm_timeline_subject"], false],
     ["CrmImport", "crm_import", "CrmImport", ["crm_import_workspace", "crm_import_status"], false],
+    ["MailingList", "mailing_list", "CrmMailingList", ["crm_list_workspace_name"], false],
+    ["Subscription", "subscription", "CrmSubscription", ["crm_sub_list_contact", "crm_sub_workspace_contact", "crm_sub_list_status"], false],
+    ["Suppression", "suppression", "CrmSuppression", ["crm_suppression_workspace_email"], false],
+    ["CrmForm", "crm_form", "CrmForm", ["crm_form_workspace"], false],
+    ["CrmSetting", "crm_setting", "CrmSetting", ["crm_setting_key"], false],
 ];
 
 const ROUTES: [string, string][] = [
@@ -52,6 +57,11 @@ const ROUTES: [string, string][] = [
     ["Task", "tasks"],
     ["Timeline", "timeline"],
     ["Import", "imports"],
+    ["List", "lists"],
+    ["Subscription", "subscriptions"],
+    ["Suppression", "suppressions"],
+    ["Form", "forms"],
+    ["Public", "public"],
 ];
 
 describe("plugin entry points", () => {
@@ -92,9 +102,18 @@ describe("plugin manifest", () => {
         const manifest: any = parsePluginManifest(pkg);
         expect(typeof manifest).toBe("object");
         expect(manifest).toEqual(expect.objectContaining({ displayName: "CRM", mailboxScopedData: true }));
-        expect(manifest.ui.apps).toEqual([{ id: "crm", host: "www", mount: "/crm", dir: "apps/crm" }]);
+        expect(manifest.ui.apps).toEqual([
+            { id: "crm", host: "www", mount: "/crm", dir: "apps/crm" },
+            { id: "subscriptions", host: "public", mount: "/subscriptions", dir: "apps/subscriptions" },
+            { id: "forms", host: "public", mount: "/f", dir: "apps/f" },
+        ]);
         expect(manifest.ui.appRail).toEqual([{ id: "crm", label: "CRM", href: "/crm", icon: "HiOutlineUserGroup" }]);
-        expect(manifest.settings.map((setting: any) => setting.key)).toEqual(["mail:crm:workspace_creator_roles", "mail:crm:max_workspaces_per_user"]);
+        expect(manifest.settings.map((setting: any) => setting.key)).toEqual([
+            "mail:crm:public_url",
+            "mail:crm:workspace_creator_roles",
+            "mail:crm:max_workspaces_per_user",
+        ]);
+        expect(manifest.settings[0].default).toBe("https://<host>");
     });
 
     it("ships every UI app's sources, with a layout, in the package", () => {

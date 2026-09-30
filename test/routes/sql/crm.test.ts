@@ -10,7 +10,7 @@ import { MailboxSQL } from "@rapidmx/restapi/sql";
 import { CrmRepos } from "../../../src/models/CrmModelClasses.js";
 import { SQL_MODELS } from "../../../src/models/sql/index.js";
 import { CrmImportJobSQL } from "../../../src/jobs/sql/CrmImportJobSQL.js";
-import { registerTestDoubles, type InMemoryBlobStore } from "../../testDoubles.js";
+import { registerTestDoubles, type InMemoryBlobStore, type RecordingMailTransport } from "../../testDoubles.js";
 import { CrmTestContext, TestUser } from "../context.js";
 import { runCrmSuites } from "../suites.js";
 
@@ -92,6 +92,7 @@ describe("CRM routes (SQL)", () => {
         repo: async (name: string) => await repos.get(name as any),
         pushed: () => pushed,
         route: (name: string) => objectFactory.getInstance(`routes.${name}`),
+        transport: () => objectFactory.getInstance<RecordingMailTransport>("MailTransport") as RecordingMailTransport,
     };
 
     runCrmSuites(ctx);

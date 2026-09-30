@@ -110,6 +110,11 @@ export class CrmImportSQL extends BaseEntity implements CrmImport {
     @Nullable
     public finishedAt?: Date;
 
+    @Column({ nullable: true })
+    @Description("A list every imported contact is subscribed to.")
+    @Nullable
+    public listUid?: string;
+
     constructor(other?: Partial<CrmImportSQL>) {
         super(other);
 
@@ -133,6 +138,7 @@ export class CrmImportSQL extends BaseEntity implements CrmImport {
             this.leaseExpiresAt = "leaseExpiresAt" in other ? other.leaseExpiresAt : this.leaseExpiresAt;
             this.attempts = other.attempts !== undefined ? other.attempts : this.attempts;
             this.finishedAt = "finishedAt" in other ? other.finishedAt : this.finishedAt;
+            this.listUid = "listUid" in other ? other.listUid : this.listUid;
         }
     }
 }

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Jean-Philippe Steinmetz
 // SPDX-License-Identifier: MPL-2.0
 ///////////////////////////////////////////////////////////////////////////////
-import { CrmObjectType, PropertyDefinition } from "./crmApi.js";
+import { CrmObjectType, MailingList, PropertyDefinition } from "./crmApi.js";
 
 /** How a field's value is entered and compared. */
 export type FieldKind = "text" | "number" | "date" | "boolean" | "select" | "multi";
@@ -78,11 +78,14 @@ export function propertyKind(definition: PropertyDefinition): FieldKind {
     }
 }
 
-/** Every field of `objectType` records: their own, `tags`, and the workspace's custom properties for them. */
-export function recordFields(objectType: CrmObjectType, definitions: PropertyDefinition[]): FieldInfo[] {
+/** Every field of `objectType` records: their own, `tags`, a contact's `lists`, and the workspace's custom properties for them. */
+export function recordFields(objectType: CrmObjectType, definitions: PropertyDefinition[], lists: MailingList[] = []): FieldInfo[] {
     return [
         ...(objectType === "contact" ? CONTACT_FIELDS : COMPANY_FIELDS),
         { name: "tags", label: "Tags", kind: "multi" },
+        ...(objectType === "contact"
+            ? [{ name: "lists", label: "Lists", kind: "multi" as const, options: lists.map((list) => ({ value: list.uid, label: list.name })) }]
+            : []),
         ...definitions
             .filter((definition) => definition.objectType === objectType)
             .map((definition) => ({

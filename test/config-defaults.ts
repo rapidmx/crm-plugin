@@ -64,6 +64,7 @@ export function buildTestConfigDefaults(datastores: Record<string, any>) {
             crm: {
                 // Small enough that the limit is exercised by the tests.
                 max_workspaces_per_user: 3,
+                public_url: "https://crm.rapidmx-test.example.com/",
             },
         },
     };

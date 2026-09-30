@@ -73,4 +73,12 @@ export function stubBasics(api: any, overrides: { workspaces?: any[] } = {}): vo
     api.listSenders.mockResolvedValue([]);
     api.listNotes.mockResolvedValue([]);
     api.listTimeline.mockResolvedValue([]);
+    api.listLists.mockResolvedValue([]);
+    api.listSubscriptions.mockResolvedValue([]);
+    api.listForms.mockResolvedValue([]);
+    api.listSuppressions.mockResolvedValue([]);
+}
+
+export function list(overrides: Record<string, unknown> = {}): any {
+    return { uid: "l1", name: "Newsletter", publicName: "News", doubleOptIn: false, visible: true, subscribedCount: 3, pendingCount: 1, ...stored, ...overrides };
 }

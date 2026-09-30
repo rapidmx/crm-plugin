@@ -84,6 +84,20 @@ Keep entries terse — this is a reference, not a transcript.
   `AppShell` with `active="crm"`, a workspace switcher and sections). The selected workspace travels as `?w=` and is remembered in
   `localStorage`. Pages are full page loads (plugin pages aren't in the client router).
 
+- **Subscriptions** are one row per list and contact (unique), never deleted on unsubscribe - the row is the opt-out record. A
+  contact's subscribed lists are mirrored as `PropertyValue` rows (key `lists`), kept in step by `CrmRouteBase.setSubscription()`,
+  the only place subscriptions change; filters use them (`{ field: "lists", op: "eq", value: listUid }`). `subscribed` never goes
+  back to `pending`. `CrmContact.emailStatus` is the "unsubscribed from all" switch (plus bounced/complained); `Suppression` rows
+  are per-address and outlive the contact.
+- **Public links are signed tokens** (`util/Tokens.ts`, HMAC-SHA256 over base64url JSON: purpose, workspace, contact, lists,
+  expiry). The key is `mail:crm:token_secret` or else generated once and kept as `CrmSetting` `token-secret` (unique key; a losing
+  concurrent create reads the winner's). Purposes: `prefs` (no expiry), `unsub` (no expiry, one list or all), `confirm` (7 days).
+  Invalid anything = 404. Confirm and unsubscribe are POSTs behind a button on the landing pages, so link scanners can't act; the
+  unsubscribe endpoint also serves RFC 8058 one-click POSTs from mail clients.
+- **Forms**: anonymous submissions go through the contact route's `importRow()` (as imports do) but only fill fields/properties an
+  existing contact doesn't have; honeypot field `website`; per-IP rate limit on every public endpoint (`RateLimiter`, key
+  `crm-<kind>|<ip/64>`). Links in emails use `mail:crm:public_url` (manifest default `https://<host>`), never the request's Host.
+
 ## Session Log
 
 ### 2026-09-29 — Phase 1: the plugin created
@@ -98,3 +112,13 @@ Keep entries terse — this is a reference, not a transcript.
   workspace -> contact -> tag filter round trip through `/api/mail/crm` worked. `react-icons` is a peer dependency (the server's
   copy, like React's) since the pages import icons from it.
 - Known wart: Mongo responses carry the document's `_id` next to `uid`, as restapi's own responses do.
+
+### 2026-09-29 — Phase 2: lists, subscriptions, consent, preference center, forms
+
+- New models `MailingList`, `Subscription`, `Suppression`, `CrmForm`, `CrmSetting`; routes `lists`, `subscriptions`,
+  `suppressions`, `forms`, `public`; public UI apps `/subscriptions` and `/f`; CRM pages Lists and Forms; import can subscribe to a
+  list. `nodemailer` is now a dependency (confirmation emails, `util/Mailer.ts`).
+- Test harness: the Mongo harness now deletes a mailbox's ACL before re-creating it (ACLs survive the per-test clean-up, and a
+  mailbox's uid is its address); routes cache the token key, so tests that clear `CrmSetting` reset `cachedTokenSecret`.
+- Unverified: whether the server's headers let `/f/<form>` be framed by another site (the embed code is an iframe). If framing is
+  refused, the "Open form" link still works.

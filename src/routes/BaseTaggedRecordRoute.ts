@@ -75,13 +75,18 @@ export abstract class BaseTaggedRecordRoute<T extends TaggedRecord> extends Base
      * the same checks and side effects as the API: a row the same as an existing record updates it when `updateExisting` is set -
      * adding its tags to the record's rather than replacing them - and is skipped otherwise. A bad row throws its 400.
      */
-    public async importRow(workspaceUid: string, userUid: string, body: Record<string, unknown>, updateExisting: boolean): Promise<"created" | "updated" | "skipped"> {
+    public async importRow(
+        workspaceUid: string,
+        userUid: string,
+        body: Record<string, unknown>,
+        updateExisting: boolean,
+    ): Promise<{ outcome: "created" | "updated" | "skipped"; uid: string }> {
         const context: WriteContext = { workspaceUid, user: { uid: userUid } as JWTUser };
         const repo: RepoUtils<T> = await this.records();
         const existing: T | undefined = await this.findExisting(workspaceUid, body);
         if (existing) {
             if (!updateExisting) {
-                return "skipped";
+                return { outcome: "skipped", uid: existing.uid };
             }
             const request: Record<string, unknown> = { ...body };
             if (Array.isArray(body.tags)) {
@@ -93,13 +98,13 @@ export abstract class BaseTaggedRecordRoute<T extends TaggedRecord> extends Base
                 skipPush: true,
             });
             await this.afterWrite(updated, existing, request, context);
-            return "updated";
+            return { outcome: "updated", uid: updated.uid };
         }
         const fields: Partial<T> = await this.readCreate(body, context);
         const modelClass: any = this.classes[this.model];
         const record: T = await repo.create(new modelClass({ ...fields, workspaceUid }), { ignoreACL: true, skipPush: true });
         await this.afterWrite(record, undefined, body, context);
-        return "created";
+        return { outcome: "created", uid: record.uid };
     }
 
     /** The workspace's custom property definitions for this record type. */
@@ -152,7 +157,8 @@ export abstract class BaseTaggedRecordRoute<T extends TaggedRecord> extends Base
                 subjectUid: record.uid,
                 kind: before ? TimelineKind.UPDATED : TimelineKind.CREATED,
                 summary: before ? `Updated ${changed.join(", ")}` : `Created the ${this.noun}`,
-                actorUserUid: context.user.uid.toLowerCase(),
+                // An import or a form submission by nobody in particular has no actor.
+                actorUserUid: context.user.uid.toLowerCase() || undefined,
                 data: before ? { fields: changed } : {},
             });
         }

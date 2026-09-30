@@ -283,7 +283,7 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
         @AuthUser user?: JWTUser,
     ): Promise<WorkspaceSender> {
         await this.requireAccess(user, workspaceUid, WorkspaceAction.MANAGE);
-        const sender: WorkspaceSender = await this.requireSender(workspaceUid, senderUid);
+        const sender: WorkspaceSender = await this.requireWorkspaceSender(workspaceUid, senderUid);
         const request: Record<string, unknown> = requireObject(body);
         const fromName: string | null | undefined = readText(request, "fromName");
         const replyToAddress: string | null | undefined = readEmail(request, "replyToAddress");
@@ -304,7 +304,7 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
     @Delete("/:workspaceUid/senders/:senderUid")
     public async removeSender(@Param("workspaceUid") workspaceUid: string, @Param("senderUid") senderUid: string, @AuthUser user?: JWTUser): Promise<void> {
         await this.requireAccess(user, workspaceUid, WorkspaceAction.MANAGE);
-        const sender: WorkspaceSender = await this.requireSender(workspaceUid, senderUid);
+        const sender: WorkspaceSender = await this.requireWorkspaceSender(workspaceUid, senderUid);
         await (await this.repo("workspaceSender")).delete(sender.uid, { ignoreACL: true, purge: true, skipPush: true });
         this.notify(workspaceUid, "WorkspaceSender", "delete", { uid: sender.uid });
     }
@@ -406,7 +406,7 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
         return workspace;
     }
 
-    private async requireSender(workspaceUid: string, senderUid: string): Promise<WorkspaceSender> {
+    private async requireWorkspaceSender(workspaceUid: string, senderUid: string): Promise<WorkspaceSender> {
         const sender: WorkspaceSender | undefined = await (await this.repo<WorkspaceSender>("workspaceSender")).findOne(senderUid, { ignoreACL: true });
         if (!sender || sender.workspaceUid !== workspaceUid) {
             throw notFound();

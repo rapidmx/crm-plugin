@@ -13,8 +13,14 @@ This first release covers the CRM core:
 - **Notes, tasks and an activity timeline** on every contact and company.
 - **CSV import** of contacts and companies, with a suggested column mapping, imported in the background.
 - **Send-as addresses**: the mailboxes a workspace will send marketing mail from and receive replies in.
+- **Mailing lists and subscriptions**, with the consent behind each (when, how, from what address), and list membership as a
+  filter.
+- **Signup forms** at `/f/<form>`, linkable or embeddable in another site, with optional **double opt-in** by email.
+- **A preference center** at `/subscriptions/<token>` where a subscriber chooses their lists or unsubscribes from all email, and
+  **one-click unsubscribe** links (RFC 8058) - no account needed, the links carry signed tokens.
+- **A suppression list** of addresses never to email.
 
-Mailing lists, campaigns, templates, engagement tracking, automations and sales pipelines follow in later releases.
+Campaigns, templates, engagement tracking, automations and sales pipelines follow in later releases.
 
 ## Installing
 
@@ -25,6 +31,8 @@ The CRM then appears on the web client's app rail, at `/crm`. It requires `@rapi
 
 | Key | Default | Meaning |
 | --- | --- | --- |
+| `mail:crm:public_url` | `https://<host>` | The site the public pages are served from; links in CRM emails point here. |
+| `mail:crm:token_secret` | (generated) | The key public links are signed with. Left empty, one is generated and kept in the database. |
 | `mail:crm:workspace_creator_roles` | (empty) | Comma-separated roles allowed to create workspaces. Empty lets every signed-in user. |
 | `mail:crm:max_workspaces_per_user` | `10` | How many workspaces one user may create. |
 | `mail:crm:max_members` | `500` | How many members one workspace may have. |
@@ -48,6 +56,9 @@ A deployment administrator has no access to a workspace they aren't a member of.
 | `properties`, `notes`, `tasks` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
 | `timeline` | `GET /:workspaceUid/:subjectType/:subjectUid` |
 | `imports` | `GET /:workspaceUid`, `POST /:workspaceUid?objectType=&fileName=` (raw CSV body), `POST /:workspaceUid/:uid/start`, `GET/DELETE /:workspaceUid/:uid` |
+| `lists`, `suppressions`, `forms` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
+| `subscriptions` | `GET /:workspaceUid?listUid=&contactUid=&status=`, `POST /:workspaceUid` (`{ listUid, contactUids, status }`) |
+| `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `POST /unsubscribe/:token` |
 
 A search takes `{ filter, q, sort: { field, direction }, limit, page }` and answers `{ items, total }`. A filter is a condition
 `{ field, op, value }` or a group `{ and: [...] }` / `{ or: [...] }`. Fields are a record's own fields, `tags`, or

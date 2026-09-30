@@ -148,6 +148,7 @@ export abstract class BaseImportRoute extends CrmRouteBase {
                 mapping,
                 updateExisting: readBoolean(request, "updateExisting") ?? true,
                 tags: readTags(request) ?? [],
+                listUid: await this.readImportList(existing, request.listUid),
                 status: ImportStatus.QUEUED,
             } as any,
             existing,
@@ -166,6 +167,17 @@ export abstract class BaseImportRoute extends CrmRouteBase {
         }
         await (await this.repo("import")).delete(existing.uid, { ignoreACL: true, purge: true, skipPush: true });
         await this.deleteBlob(existing.blobKey);
+    }
+
+    /** The list a contact import subscribes its contacts to: a list of the workspace, or none. */
+    private async readImportList(existing: CrmImport, listUid: unknown): Promise<string | undefined> {
+        if (listUid === undefined || listUid === null || listUid === "") {
+            return undefined;
+        }
+        if (existing.objectType !== CrmObjectType.CONTACT || !(await this.findList(existing.workspaceUid, listUid))) {
+            throw badRequest("'listUid' must be a list of the workspace, and only a contact import can subscribe to one.");
+        }
+        return listUid as string;
     }
 
     private async definitions(workspaceUid: string, objectType: string): Promise<PropertyDefinition[]> {

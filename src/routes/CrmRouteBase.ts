@@ -2,17 +2,46 @@
 // Copyright (C) 2026 Jean-Philippe Steinmetz. All rights reserved.
 // SPDX-License-Identifier: MPL-2.0
 ///////////////////////////////////////////////////////////////////////////////
+import * as crypto from "crypto";
 import { ObjectDecorators, type JWTUser } from "@rapidrest/core";
-import { ACLUtils, ModelUtils, NotificationUtils, ObjectFactory } from "@rapidrest/service-core";
+import { ACLUtils, ModelUtils, NotificationUtils, ObjectFactory, RepoUtils } from "@rapidrest/service-core";
 import { CrmModelClasses, CrmModelName, CrmRepos } from "../models/CrmModelClasses.js";
-import { CrmObjectType, TimelineEvent, WorkspaceAction, WorkspaceMember } from "../models/types.js";
+import {
+    CrmObjectType,
+    CrmSetting,
+    MailingList,
+    Subscription,
+    SubscriptionStatus,
+    TimelineEvent,
+    TimelineKind,
+    WorkspaceAction,
+    WorkspaceMember,
+    WorkspaceSender,
+} from "../models/types.js";
+import { TokenPayload, signToken } from "../util/Tokens.js";
 import { assertWorkspaceAccess } from "../util/WorkspaceAccess.js";
 import { badRequest } from "../util/Validation.js";
 const { Config, Inject, Logger } = ObjectDecorators;
 
+/** The `PropertyValue.key` a contact's subscribed lists are mirrored under, so filters can match list membership. */
+export const LISTS_KEY = "lists";
+
+/** The `CrmSetting` key of the generated token signing key. */
+const TOKEN_SECRET_KEY = "token-secret";
+
+/** Who or what changed a subscription, and from where. */
+export interface SubscriptionChange {
+    /** `form`, `import`, `manual`, `preferences`, `unsubscribe-link`, `api`... */
+    source: string;
+    /** The subscriber's address, for consent given by the subscriber themselves. */
+    ip?: string;
+    /** The member who made the change, if a member did. */
+    actorUserUid?: string;
+}
+
 /**
  * What every CRM route shares: the model classes of its backend (`classes`, from `MONGO_MODELS`/`SQL_MODELS`), their repositories,
- * workspace access checks, the workspace's push channel and the activity timeline.
+ * workspace access checks, the workspace's push channel, the activity timeline, subscriptions, and the signed links in emails.
  *
  * Every model keeps a deny-all class ACL; routes check the caller against the *workspace's* ACL (`requireAccess()`) and then read
  * and write with `ignoreACL: true`, always scoped by `workspaceUid`.
@@ -33,10 +62,19 @@ export abstract class CrmRouteBase {
     @Config("trusted_roles", ["admin"])
     protected trustedRoles: string[] = ["admin"];
 
+    /** The site the public pages (preference center, forms) are served from, e.g. `https://mail.example.com`. */
+    @Config("mail:crm:public_url", "")
+    protected publicUrl: string = "";
+
+    /** The key tokens are signed with. Empty: one is generated and kept (`CrmSetting` `token-secret`). */
+    @Config("mail:crm:token_secret", "")
+    protected configuredTokenSecret: string = "";
+
     @Logger
     protected logger?: any;
 
     private crmRepos?: CrmRepos;
+    private cachedTokenSecret?: string;
 
     /** The repository of `name`'s model. */
     protected async repo<T = any>(name: CrmModelName) {
@@ -84,6 +122,27 @@ export abstract class CrmRouteBase {
         return { subjectType: subjectType as CrmObjectType, subjectUid: subjectUid as string };
     }
 
+    /** `senderUid` when it is a sender of the workspace, or a 400. */
+    protected async requireSender(workspaceUid: string, senderUid: unknown): Promise<string> {
+        const sender: WorkspaceSender | undefined =
+            typeof senderUid === "string" && senderUid.length > 0 && senderUid.length <= 64
+                ? await (await this.repo<WorkspaceSender>("workspaceSender")).findOne(senderUid, { ignoreACL: true, skipCache: true })
+                : undefined;
+        if (!sender || sender.workspaceUid !== workspaceUid) {
+            throw badRequest("'senderUid' must be a sender of the workspace.");
+        }
+        return sender.uid;
+    }
+
+    /** The workspace's list `listUid`, or `undefined`. */
+    protected async findList(workspaceUid: string, listUid: unknown): Promise<MailingList | undefined> {
+        if (typeof listUid !== "string" || listUid.length === 0 || listUid.length > 64) {
+            return undefined;
+        }
+        const list: MailingList | undefined = await (await this.repo<MailingList>("mailingList")).findOne(listUid, { ignoreACL: true, skipCache: true });
+        return list?.workspaceUid === workspaceUid ? list : undefined;
+    }
+
     /** Tells the workspace's open pages (everyone subscribed to its channel on `/push`) that `type` records changed. */
     protected notify(workspaceUid: string, type: string, action: "create" | "update" | "delete", data: unknown): void {
         this.notificationUtils?.sendMessage(workspaceUid, type, action, data);
@@ -109,5 +168,107 @@ export abstract class CrmRouteBase {
         } catch (err: any) {
             this.logger?.warn(`${this.constructor.name}: could not add a timeline entry: ${err?.message ?? err}`);
         }
+    }
+
+    /**
+     * The key tokens are signed with: `mail:crm:token_secret`, or else one generated on first use and kept as a `CrmSetting`, so every
+     * server copy signs and checks with the same key. Two copies generating one at once both read back whichever was saved first.
+     */
+    protected async tokenSecret(): Promise<string> {
+        if (this.configuredTokenSecret) {
+            return this.configuredTokenSecret;
+        }
+        if (this.cachedTokenSecret) {
+            return this.cachedTokenSecret;
+        }
+        const repo: RepoUtils<CrmSetting> = await this.repo<CrmSetting>("setting");
+        const find = async (): Promise<CrmSetting | undefined> =>
+            (await repo.find({ key: ModelUtils.literal(TOKEN_SECRET_KEY) }, { ignoreACL: true, limit: 1, skipCache: true }))[0];
+        let setting: CrmSetting | undefined = await find();
+        if (!setting) {
+            try {
+                setting = await repo.create(new this.classes.setting({ key: TOKEN_SECRET_KEY, value: crypto.randomBytes(32).toString("base64url") }), {
+                    ignoreACL: true,
+                    skipPush: true,
+                });
+            } catch {
+                // Another copy saved one first (the key is unique): use theirs.
+                setting = await find();
+            }
+        }
+        this.cachedTokenSecret = setting!.value;
+        return this.cachedTokenSecret;
+    }
+
+    /** An absolute link to a public page under `mail:crm:public_url`, e.g. `publicLink("/subscriptions/<token>")`. */
+    protected publicLink(path: string): string {
+        return `${this.publicUrl.replace(/\/+$/, "")}${path}`;
+    }
+
+    /** A signed token for a public link - see `util/Tokens.ts`. */
+    protected async token(payload: TokenPayload): Promise<string> {
+        return signToken(payload, await this.tokenSecret());
+    }
+
+    /**
+     * Sets a contact's subscription to a list: creates it, or moves it to `status`. A subscription already `subscribed` stays so when
+     * asked to become `pending` (a form filled in again doesn't make a subscriber confirm twice). Keeps the contact's `lists` values
+     * (what filters match on) in step, and records subscribing and unsubscribing on the contact's timeline. Returns the subscription.
+     */
+    public async setSubscription(
+        workspaceUid: string,
+        listUid: string,
+        contactUid: string,
+        status: SubscriptionStatus,
+        change: SubscriptionChange,
+    ): Promise<Subscription> {
+        const repo: RepoUtils<Subscription> = await this.repo<Subscription>("subscription");
+        const existing: Subscription | undefined = (
+            await repo.find({ listUid: ModelUtils.literal(listUid), contactUid: ModelUtils.literal(contactUid) }, { ignoreACL: true, limit: 1, skipCache: true })
+        )[0];
+        if (existing && (existing.status === status || (existing.status === SubscriptionStatus.SUBSCRIBED && status === SubscriptionStatus.PENDING))) {
+            return existing;
+        }
+        const now: Date = new Date();
+        const fields: Record<string, unknown> = {
+            status,
+            source: change.source,
+            ...(status === SubscriptionStatus.SUBSCRIBED ? { consentAt: now, consentIp: change.ip ?? null, unsubscribedAt: null } : {}),
+            ...(status === SubscriptionStatus.PENDING ? { consentIp: change.ip ?? null, unsubscribedAt: null } : {}),
+            ...(status === SubscriptionStatus.UNSUBSCRIBED ? { unsubscribedAt: now } : {}),
+        };
+        const subscription: Subscription = existing
+            ? await repo.update({ ...fields, uid: existing.uid, version: existing.version }, new this.classes.subscription(existing), {
+                  ignoreACL: true,
+                  skipPush: true,
+              })
+            : await repo.create(new this.classes.subscription({ workspaceUid, listUid, contactUid, ...fields }), { ignoreACL: true, skipPush: true });
+
+        const values: RepoUtils<any> = await this.repo("propertyValue");
+        await values.truncate(
+            { objectUid: ModelUtils.literal(contactUid), key: ModelUtils.literal(LISTS_KEY), stringValue: ModelUtils.literal(listUid) },
+            { ignoreACL: true },
+        );
+        if (status === SubscriptionStatus.SUBSCRIBED) {
+            await values.create(
+                new this.classes.propertyValue({ workspaceUid, objectType: CrmObjectType.CONTACT, objectUid: contactUid, key: LISTS_KEY, stringValue: listUid }),
+                { ignoreACL: true, skipPush: true },
+            );
+        }
+        if (status !== SubscriptionStatus.PENDING) {
+            const list: MailingList | undefined = await this.findList(workspaceUid, listUid);
+            await this.addTimeline({
+                workspaceUid,
+                subjectType: CrmObjectType.CONTACT,
+                subjectUid: contactUid,
+                kind: status === SubscriptionStatus.SUBSCRIBED ? TimelineKind.SUBSCRIBED : TimelineKind.UNSUBSCRIBED,
+                summary: `${status === SubscriptionStatus.SUBSCRIBED ? "Subscribed to" : "Unsubscribed from"} ${list?.name ?? "a list"}`,
+                actorUserUid: change.actorUserUid,
+                data: { listUid, source: change.source },
+                refUid: listUid,
+            });
+        }
+        this.notify(workspaceUid, "CrmSubscription", existing ? "update" : "create", JSON.parse(JSON.stringify(subscription)));
+        return subscription;
     }
 }

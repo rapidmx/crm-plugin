@@ -240,6 +240,9 @@ export enum TimelineKind {
     IMPORTED = "imported",
     EMAIL_SENT = "email_sent",
     EMAIL_RECEIVED = "email_received",
+    SUBSCRIBED = "subscribed",
+    UNSUBSCRIBED = "unsubscribed",
+    FORM_SUBMITTED = "form_submitted",
 }
 
 /** One entry of a contact's, company's or deal's activity timeline. Append-only. */
@@ -309,7 +312,110 @@ export interface CrmImport extends CrmEntity {
     leaseExpiresAt?: Date;
     attempts: number;
     finishedAt?: Date;
+    /** A mailing list every imported contact is subscribed to (source `import`), if the importer chose one. */
+    listUid?: string;
 }
 
 /** How many row errors an import keeps. */
 export const MAX_IMPORT_ERRORS = 100;
+
+/**
+ * A mailing list of a workspace: the contacts subscribed to it get the campaigns sent to it. A list shown in the preference center
+ * (`visible`) is one a subscriber can join or leave there by themselves; with `doubleOptIn`, a subscription made by a form stays
+ * pending until the subscriber confirms it by email, sent from `senderUid`.
+ */
+export interface MailingList extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    description?: string;
+    /** The name subscribers see (in the preference center and confirmation emails). */
+    publicName: string;
+    publicDescription?: string;
+    doubleOptIn: boolean;
+    /** Shown in the preference center even to contacts not subscribed to it. */
+    visible: boolean;
+    /** The `WorkspaceSender` confirmation emails are sent from. Required with `doubleOptIn`. */
+    senderUid?: string;
+}
+
+export enum SubscriptionStatus {
+    /** Waiting for the subscriber to confirm by email (double opt-in). */
+    PENDING = "pending",
+    SUBSCRIBED = "subscribed",
+    UNSUBSCRIBED = "unsubscribed",
+}
+
+/**
+ * A contact's subscription to a list, with the consent behind it. Unique per list and contact. An unsubscribed one is kept (not
+ * deleted) as the record that the contact opted out.
+ */
+export interface Subscription extends CrmEntity {
+    workspaceUid: string;
+    listUid: string;
+    contactUid: string;
+    status: SubscriptionStatus;
+    /** How it was made: `form`, `import`, `manual`, `preferences`, `api`. */
+    source: string;
+    /** When the contact gave (or confirmed) consent. */
+    consentAt?: Date;
+    /** The address consent was given from, for a form or preference center subscription. */
+    consentIp?: string;
+    unsubscribedAt?: Date;
+    /** When the last confirmation email was sent, while pending. */
+    confirmSentAt?: Date;
+}
+
+export enum SuppressionReason {
+    HARD_BOUNCE = "hard_bounce",
+    COMPLAINT = "complaint",
+    MANUAL = "manual",
+}
+
+/**
+ * An address the workspace must never send marketing mail to, whatever list it is on and even after its contact is deleted and made
+ * again. Unique per workspace and address.
+ */
+export interface Suppression extends CrmEntity {
+    workspaceUid: string;
+    /** Lowercase. */
+    email: string;
+    reason: SuppressionReason;
+    note?: string;
+}
+
+/** One field of a signup form. */
+export interface FormField {
+    /** Where the value goes: `email`, `firstName`, `lastName`, `phone`, `jobTitle`, `company`, or `properties.<key>`. */
+    target: string;
+    label: string;
+    required: boolean;
+}
+
+/** A public signup form: who fills it in becomes (or updates) a contact and is subscribed to its lists. */
+export interface CrmForm extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    /** The heading the form shows. */
+    title: string;
+    description?: string;
+    fields: FormField[];
+    listUids: string[];
+    /** Subscriptions stay pending until confirmed by email. */
+    doubleOptIn: boolean;
+    /** The sender of the confirmation email. Required with `doubleOptIn`. */
+    senderUid?: string;
+    /** What the form says once submitted. */
+    successMessage: string;
+    /** Where the browser goes once submitted, instead of the message (https only). */
+    redirectUrl?: string;
+    /** Tags added to the contact. */
+    tags: string[];
+    enabled: boolean;
+    submissionCount: number;
+}
+
+/** A deployment-wide value the plugin generates and keeps (the key tokens are signed with). Unique by `key`. */
+export interface CrmSetting extends CrmEntity {
+    key: string;
+    value: string;
+}

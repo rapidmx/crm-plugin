@@ -6,11 +6,16 @@ import { MailboxSQL } from "@rapidmx/restapi/sql";
 import type { CrmModelClasses } from "../CrmModelClasses.js";
 import { CrmCompanySQL } from "./CrmCompanySQL.js";
 import { CrmContactSQL } from "./CrmContactSQL.js";
+import { CrmFormSQL } from "./CrmFormSQL.js";
 import { CrmImportSQL } from "./CrmImportSQL.js";
 import { CrmNoteSQL } from "./CrmNoteSQL.js";
+import { CrmSettingSQL } from "./CrmSettingSQL.js";
 import { CrmTaskSQL } from "./CrmTaskSQL.js";
+import { MailingListSQL } from "./MailingListSQL.js";
 import { PropertyDefinitionSQL } from "./PropertyDefinitionSQL.js";
 import { PropertyValueSQL } from "./PropertyValueSQL.js";
+import { SubscriptionSQL } from "./SubscriptionSQL.js";
+import { SuppressionSQL } from "./SuppressionSQL.js";
 import { TimelineEventSQL } from "./TimelineEventSQL.js";
 import { WorkspaceSQL } from "./WorkspaceSQL.js";
 import { WorkspaceMemberSQL } from "./WorkspaceMemberSQL.js";
@@ -29,5 +34,10 @@ export const SQL_MODELS: CrmModelClasses = {
     task: CrmTaskSQL,
     timelineEvent: TimelineEventSQL,
     import: CrmImportSQL,
+    mailingList: MailingListSQL,
+    subscription: SubscriptionSQL,
+    suppression: SuppressionSQL,
+    form: CrmFormSQL,
+    setting: CrmSettingSQL,
     mailbox: MailboxSQL,
 };

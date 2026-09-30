@@ -10,14 +10,17 @@ import Modal from "@rapidmx/web-client/lib/components/overlays/Modal.js";
 import {
     CrmObjectType,
     CrmRecord,
+    MailingList,
     PropertyDefinition,
     SearchRequest,
     bulkRecords,
     createRecord,
     errorMessage,
     exportRecords,
+    listLists,
     listProperties,
     searchRecords,
+    setSubscriptions,
 } from "../crmApi.js";
 import { FieldInfo, fieldValue, formatValue, recordFields } from "../fields.js";
 import { INPUT_CLASS, useCrm } from "./CrmShell.js";
@@ -63,8 +66,10 @@ export default function RecordList({ objectType }: { objectType: CrmObjectType }
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [creating, setCreating] = useState(false);
     const [tagAction, setTagAction] = useState<"addTags" | "removeTags" | null>(null);
+    const [lists, setLists] = useState<MailingList[]>([]);
+    const [listAction, setListAction] = useState<"subscribed" | "unsubscribed" | null>(null);
 
-    const fields: FieldInfo[] = useMemo(() => recordFields(objectType, definitions), [objectType, definitions]);
+    const fields: FieldInfo[] = useMemo(() => recordFields(objectType, definitions, lists), [objectType, definitions, lists]);
     const columns: FieldInfo[] = COLUMNS[objectType].map((name) => fields.find((field) => field.name === name)!);
     const request: SearchRequest = { q: query.trim() || undefined, filter: buildFilter(draft, fields), sort };
 
@@ -72,6 +77,17 @@ export default function RecordList({ objectType }: { objectType: CrmObjectType }
         listProperties(workspace.uid, objectType)
             .then(setDefinitions)
             .catch(() => setDefinitions([]));
+        if (objectType === "contact") {
+            listLists(workspace.uid)
+                .then(setLists)
+                .catch(() => setLists([]));
+            // `?list=<uid>` (the Lists page's "Subscribers" link) opens the list's subscribers.
+            const listUid: string | null = new URLSearchParams(window.location.search).get("list");
+            if (listUid) {
+                setDraft({ match: "and", conditions: [{ field: "lists", op: "eq", value: listUid }] });
+                setFilterOpen(true);
+            }
+        }
     }, [workspace.uid, objectType]);
 
     async function load(): Promise<void> {
@@ -119,6 +135,17 @@ export default function RecordList({ objectType }: { objectType: CrmObjectType }
             await load();
         } catch (err) {
             setError(errorMessage(err, "Could not change the selected records."));
+        }
+    }
+
+    async function runListAction(listUid: string): Promise<void> {
+        try {
+            await setSubscriptions(workspace.uid, { listUid, contactUids: [...selected], status: listAction! });
+            setSelected(new Set());
+            setListAction(null);
+            await load();
+        } catch (err) {
+            setError(errorMessage(err, "Could not change the selected contacts' subscriptions."));
         }
     }
 
@@ -187,6 +214,16 @@ export default function RecordList({ objectType }: { objectType: CrmObjectType }
                     <button type="button" className="text-primary-dark hover:underline" onClick={() => setTagAction("removeTags")}>
                         Remove tag
                     </button>
+                    {objectType === "contact" && lists.length > 0 && (
+                        <>
+                            <button type="button" className="text-primary-dark hover:underline" onClick={() => setListAction("subscribed")}>
+                                Add to list
+                            </button>
+                            <button type="button" className="text-primary-dark hover:underline" onClick={() => setListAction("unsubscribed")}>
+                                Remove from list
+                            </button>
+                        </>
+                    )}
                     <button
                         type="button"
                         className="text-danger hover:underline"
@@ -263,6 +300,7 @@ export default function RecordList({ objectType }: { objectType: CrmObjectType }
                 </div>
             )}
             <NewRecordModal objectType={objectType} open={creating} onClose={() => setCreating(false)} onCreated={() => void load()} />
+            <ListModal action={listAction} lists={lists} onClose={() => setListAction(null)} onSubmit={(listUid) => void runListAction(listUid)} />
             <TagModal
                 action={tagAction}
                 onClose={() => setTagAction(null)}
@@ -328,6 +366,47 @@ function NewRecordModal({ objectType, open, onClose, onCreated }: { objectType: 
                 ))}
                 <Button type="submit" className="!w-auto self-end">
                     Create
+                </Button>
+            </form>
+        </Modal>
+    );
+}
+
+/** Asks for the list to subscribe the selected contacts to, or unsubscribe them from. */
+function ListModal({
+    action,
+    lists,
+    onClose,
+    onSubmit,
+}: {
+    action: "subscribed" | "unsubscribed" | null;
+    lists: MailingList[];
+    onClose: () => void;
+    onSubmit: (listUid: string) => void;
+}) {
+    const [listUid, setListUid] = useState("");
+    return (
+        <Modal open={action !== null} onClose={onClose} title={action === "unsubscribed" ? "Remove from a list" : "Add to a list"}>
+            <form
+                className="flex flex-col gap-3"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    onSubmit(listUid);
+                    setListUid("");
+                }}
+            >
+                <FormField label="List" htmlFor="bulk-list">
+                    <select id="bulk-list" className={INPUT_CLASS} value={listUid} onChange={(event) => setListUid(event.target.value)} required>
+                        <option value="">Choose&hellip;</option>
+                        {lists.map((list) => (
+                            <option key={list.uid} value={list.uid}>
+                                {list.name}
+                            </option>
+                        ))}
+                    </select>
+                </FormField>
+                <Button type="submit" className="!w-auto self-end">
+                    {action === "unsubscribed" ? "Remove" : "Add"}
                 </Button>
             </form>
         </Modal>

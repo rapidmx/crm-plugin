@@ -4,7 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // What every route suite gets from the Mongo and SQL harnesses (`test/routes/{mongo,sql}/crm.test.ts`), and a small request helper.
 import { request } from "@rapidrest/service-core/test";
-import type { InMemoryBlobStore } from "../testDoubles.js";
+import type { InMemoryBlobStore, RecordingMailTransport } from "../testDoubles.js";
 
 export interface TestUser {
     uid: string;
@@ -28,6 +28,8 @@ export interface CrmTestContext {
     pushed: () => { uids: string[]; type: string; action: string; data: any }[];
     /** The mounted instance of a test route (`ContactRoute`, `WorkspaceRoute`...), for the few branches HTTP can't reach. */
     route: (name: string) => any;
+    /** The mail transport double: what the routes and jobs sent. */
+    transport: () => RecordingMailTransport;
 }
 
 /** A request as `user` (`null`: anonymous) to `path` under the context's prefix. */

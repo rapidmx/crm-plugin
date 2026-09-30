@@ -20,6 +20,11 @@ export interface CrmModelClasses {
     task: any;
     timelineEvent: any;
     import: any;
+    mailingList: any;
+    subscription: any;
+    suppression: any;
+    form: any;
+    setting: any;
     /** `@rapidmx/restapi`'s `Mailbox`. */
     mailbox: any;
 }

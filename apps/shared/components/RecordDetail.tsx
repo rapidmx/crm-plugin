@@ -24,7 +24,12 @@ import {
     listNotes,
     listProperties,
     listTasks,
+    listLists,
+    listSubscriptions,
     listTimeline,
+    MailingList,
+    setSubscriptions,
+    Subscription,
     updateRecord,
     updateTask,
 } from "../crmApi.js";
@@ -212,6 +217,7 @@ export default function RecordDetail({ objectType, uid }: { objectType: CrmObjec
                 )}
             </form>
             <div className="flex flex-col gap-6">
+                {objectType === "contact" && <Subscriptions uid={uid} emailStatus={(record as any).emailStatus} onChange={loadActivity} />}
                 <Notes objectType={objectType} uid={uid} notes={notes} onChange={loadActivity} />
                 <Tasks objectType={objectType} uid={uid} tasks={tasks} onChange={loadActivity} />
                 <section aria-label="Activity">
@@ -256,6 +262,63 @@ function FieldInput({ field, value, disabled, onChange }: { field: FieldInfo; va
             disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
         />
+    );
+}
+
+const STATUS_LABELS: Record<string, string> = { subscribed: "Subscribed", pending: "Awaiting confirmation", unsubscribed: "Unsubscribed" };
+
+/** A contact's subscriptions: every list, with the contact's status on it and a button to subscribe or unsubscribe them. */
+function Subscriptions({ uid, emailStatus, onChange }: { uid: string; emailStatus: string; onChange: () => Promise<void> }) {
+    const { workspace, canWrite } = useCrm();
+    const [lists, setLists] = useState<MailingList[]>([]);
+    const [subscriptions, setSubscriptionList] = useState<Subscription[]>([]);
+    const [error, setError] = useState<string | null>(null);
+
+    async function load(): Promise<void> {
+        const [listResult, subscriptionResult] = await Promise.all([listLists(workspace.uid), listSubscriptions(workspace.uid, uid)]);
+        setLists(listResult);
+        setSubscriptionList(subscriptionResult);
+    }
+
+    useEffect(() => {
+        load().catch((err) => setError(errorMessage(err, "Could not load the subscriptions.")));
+    }, [workspace.uid, uid]);
+
+    async function toggle(listUid: string, subscribed: boolean): Promise<void> {
+        try {
+            await setSubscriptions(workspace.uid, { listUid, contactUids: [uid], status: subscribed ? "unsubscribed" : "subscribed" });
+            setError(null);
+            await load();
+            await onChange();
+        } catch (err) {
+            setError(errorMessage(err, "Could not change the subscription."));
+        }
+    }
+
+    return (
+        <section aria-label="Subscriptions">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted mb-2">Subscriptions</h2>
+            {emailStatus !== "active" && <p className="text-sm text-danger mb-2">No marketing email is sent to this contact ({emailStatus}).</p>}
+            {error && <Alert>{error}</Alert>}
+            {lists.length === 0 && <p className="text-sm text-text-muted">The workspace has no lists yet.</p>}
+            <ul className="flex flex-col gap-1">
+                {lists.map((list) => {
+                    const status: string | undefined = subscriptions.find((entry) => entry.listUid === list.uid)?.status;
+                    const subscribed: boolean = status === "subscribed";
+                    return (
+                        <li key={list.uid} className="text-sm flex items-center gap-2">
+                            <span className="flex-1">{list.name}</span>
+                            <span className="text-xs text-text-muted">{status ? STATUS_LABELS[status] : "Not subscribed"}</span>
+                            {canWrite && (
+                                <button type="button" className="text-xs text-primary-dark hover:underline" onClick={() => void toggle(list.uid, subscribed)}>
+                                    {subscribed ? "Unsubscribe" : "Subscribe"}
+                                </button>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
     );
 }
 

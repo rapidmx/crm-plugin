@@ -6,7 +6,19 @@ import React, { FormEvent, useEffect, useState } from "react";
 import Alert from "@rapidmx/web-client/lib/components/feedback/Alert.js";
 import Button from "@rapidmx/web-client/lib/components/buttons/Button.js";
 import FormField from "@rapidmx/web-client/lib/components/forms/FormField.js";
-import { CrmImport, CrmObjectType, ImportColumnMapping, ImportUpload, deleteImport, errorMessage, listImports, startImport, uploadImport } from "../crmApi.js";
+import {
+    CrmImport,
+    CrmObjectType,
+    ImportColumnMapping,
+    ImportUpload,
+    MailingList,
+    deleteImport,
+    errorMessage,
+    listImports,
+    listLists,
+    startImport,
+    uploadImport,
+} from "../crmApi.js";
 import { INPUT_CLASS, useCrm } from "./CrmShell.js";
 
 /** How often the import list is refreshed while an import is queued or running, in milliseconds. */
@@ -29,6 +41,8 @@ export default function ImportWizard() {
     const [mapping, setMapping] = useState<ImportColumnMapping[]>([]);
     const [updateExisting, setUpdateExisting] = useState(true);
     const [tags, setTags] = useState("");
+    const [lists, setLists] = useState<MailingList[]>([]);
+    const [listUid, setListUid] = useState("");
     const [imports, setImports] = useState<CrmImport[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -43,6 +57,9 @@ export default function ImportWizard() {
 
     useEffect(() => {
         void loadImports();
+        listLists(workspace.uid)
+            .then(setLists)
+            .catch(() => setLists([]));
     }, [workspace.uid]);
 
     // Keeps the progress current while something is still to finish.
@@ -81,8 +98,10 @@ export default function ImportWizard() {
                     .split(",")
                     .map((tag) => tag.trim())
                     .filter(Boolean),
+                ...(listUid && upload!.import.objectType === "contact" ? { listUid } : {}),
             });
             setUpload(null);
+            setListUid("");
             setFile(null);
             setTags("");
             setError(null);
@@ -161,6 +180,18 @@ export default function ImportWizard() {
                     <FormField label="Tag everything imported with (comma-separated)" htmlFor="import-tags">
                         <input id="import-tags" className={`${INPUT_CLASS} !w-72`} value={tags} onChange={(event) => setTags(event.target.value)} />
                     </FormField>
+                    {upload.import.objectType === "contact" && lists.length > 0 && (
+                        <FormField label="Subscribe everyone imported to" htmlFor="import-list">
+                            <select id="import-list" className={`${INPUT_CLASS} !w-72`} value={listUid} onChange={(event) => setListUid(event.target.value)}>
+                                <option value="">No list</option>
+                                {lists.map((list) => (
+                                    <option key={list.uid} value={list.uid}>
+                                        {list.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </FormField>
+                    )}
                     <div className="flex gap-2">
                         <Button type="submit" disabled={busy} loading={busy} className="!w-auto">
                             Start import

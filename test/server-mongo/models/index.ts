@@ -13,3 +13,8 @@ export { CrmNoteMongo } from "../../../src/models/mongo/CrmNoteMongo.js";
 export { CrmTaskMongo } from "../../../src/models/mongo/CrmTaskMongo.js";
 export { TimelineEventMongo } from "../../../src/models/mongo/TimelineEventMongo.js";
 export { CrmImportMongo } from "../../../src/models/mongo/CrmImportMongo.js";
+export { MailingListMongo } from "../../../src/models/mongo/MailingListMongo.js";
+export { SubscriptionMongo } from "../../../src/models/mongo/SubscriptionMongo.js";
+export { SuppressionMongo } from "../../../src/models/mongo/SuppressionMongo.js";
+export { CrmFormMongo } from "../../../src/models/mongo/CrmFormMongo.js";
+export { CrmSettingMongo } from "../../../src/models/mongo/CrmSettingMongo.js";

@@ -11,7 +11,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { CrmRepos } from "../../../src/models/CrmModelClasses.js";
 import { MONGO_MODELS } from "../../../src/models/mongo/index.js";
 import { CrmImportJobMongo } from "../../../src/jobs/mongo/CrmImportJobMongo.js";
-import { registerTestDoubles, type InMemoryBlobStore } from "../../testDoubles.js";
+import { registerTestDoubles, type InMemoryBlobStore, type RecordingMailTransport } from "../../testDoubles.js";
 import { CrmTestContext, TestUser } from "../context.js";
 import { runCrmSuites } from "../suites.js";
 
@@ -85,6 +85,8 @@ describe("CRM routes (Mongo)", () => {
                     usedBytes: 0,
                 }),
             );
+            // Access records outlive the per-test clean-up, and a mailbox's uid is its address: replace any earlier one.
+            await aclRepo.deleteMany({ uid: mailbox.uid });
             await aclRepo.save({
                 uid: mailbox.uid,
                 dateCreated: new Date(),
@@ -100,6 +102,7 @@ describe("CRM routes (Mongo)", () => {
         repo: async (name: string) => await repos.get(name as any),
         pushed: () => pushed,
         route: (name: string) => objectFactory.getInstance(`routes.${name}`),
+        transport: () => objectFactory.getInstance<RecordingMailTransport>("MailTransport") as RecordingMailTransport,
     };
 
     runCrmSuites(ctx);

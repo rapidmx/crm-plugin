@@ -4,11 +4,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 import type { CrmModelClasses } from "../../models/CrmModelClasses.js";
 import { MONGO_MODELS } from "../../models/mongo/index.js";
-import { CompanyRouteMongo } from "../../routes/mongo/CompanyRouteMongo.js";
 import { ContactRouteMongo } from "../../routes/mongo/ContactRouteMongo.js";
+import { CompanyRouteMongo } from "../../routes/mongo/CompanyRouteMongo.js";
 import { CrmImportJob } from "../CrmImportJob.js";
 
-/** Imports queued CSV imports on a Mongo deployment - see `CrmImportJob`. */
+/** `CrmImportJob` on a Mongo deployment. */
 export class CrmImportJobMongo extends CrmImportJob {
     protected classes: CrmModelClasses = MONGO_MODELS;
     protected contactRouteClass: any = ContactRouteMongo;

@@ -136,6 +136,17 @@ export abstract class BaseContactRoute extends BaseTaggedRecordRoute<CrmContact>
         return companies.length === 1 ? companies[0].uid : undefined;
     }
 
+    /** Deleting contacts deletes their subscriptions too (their `lists` values go with the rest of their values). */
+    protected override async deleteRelated(uids: string[], workspaceUid: string): Promise<void> {
+        await super.deleteRelated(uids, workspaceUid);
+        if (uids.length > 0) {
+            await (await this.repo("subscription")).truncate(
+                { workspaceUid: ModelUtils.literal(workspaceUid), contactUid: ModelUtils.literal(uids, "in") },
+                { ignoreACL: true, skipPush: true },
+            );
+        }
+    }
+
     protected override listQuery(query: Record<string, unknown>): Record<string, unknown> {
         return typeof query.companyUid === "string" && query.companyUid.length > 0 && query.companyUid.length <= 64
             ? { companyUid: ModelUtils.literal(query.companyUid) }

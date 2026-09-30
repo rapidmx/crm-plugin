@@ -277,11 +277,89 @@ export const deleteTask = (workspaceUid: string, uid: string): Promise<void> => 
 export const listTimeline = (workspaceUid: string, subjectType: CrmObjectType, subjectUid: string): Promise<TimelineEvent[]> =>
     apiFetch(`/mail/crm/timeline/${enc(workspaceUid)}/${subjectType}/${enc(subjectUid)}?limit=100`);
 
+// Lists, subscriptions, suppressions, forms
+
+export interface MailingList extends Stored {
+    name: string;
+    description?: string;
+    publicName: string;
+    publicDescription?: string;
+    doubleOptIn: boolean;
+    visible: boolean;
+    senderUid?: string;
+    subscribedCount: number;
+    pendingCount: number;
+}
+
+export type SubscriptionStatus = "pending" | "subscribed" | "unsubscribed";
+
+export interface Subscription extends Stored {
+    listUid: string;
+    contactUid: string;
+    status: SubscriptionStatus;
+    source: string;
+    consentAt?: string;
+    unsubscribedAt?: string;
+}
+
+export interface Suppression extends Stored {
+    email: string;
+    reason: "hard_bounce" | "complaint" | "manual";
+    note?: string;
+}
+
+export interface FormField {
+    target: string;
+    label: string;
+    required: boolean;
+}
+
+export interface CrmForm extends Stored {
+    name: string;
+    title: string;
+    description?: string;
+    fields: FormField[];
+    listUids: string[];
+    doubleOptIn: boolean;
+    senderUid?: string;
+    successMessage: string;
+    redirectUrl?: string;
+    tags: string[];
+    enabled: boolean;
+    submissionCount: number;
+}
+
+export const listLists = (workspaceUid: string): Promise<MailingList[]> => apiFetch(`/mail/crm/lists/${enc(workspaceUid)}?limit=200`);
+export const createList = (workspaceUid: string, input: Partial<MailingList>): Promise<MailingList> => apiFetch(`/mail/crm/lists/${enc(workspaceUid)}`, json("POST", input));
+export const updateList = (workspaceUid: string, uid: string, input: Partial<MailingList>): Promise<MailingList> =>
+    apiFetch(`/mail/crm/lists/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteList = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/lists/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+
+export const listSubscriptions = (workspaceUid: string, contactUid: string): Promise<Subscription[]> =>
+    apiFetch(`/mail/crm/subscriptions/${enc(workspaceUid)}?limit=500&contactUid=${enc(contactUid)}`);
+export const setSubscriptions = (workspaceUid: string, input: { listUid: string; contactUids: string[]; status: "subscribed" | "unsubscribed" }): Promise<{ changed: number }> =>
+    apiFetch(`/mail/crm/subscriptions/${enc(workspaceUid)}`, json("POST", input));
+
+export const listSuppressions = (workspaceUid: string): Promise<Suppression[]> => apiFetch(`/mail/crm/suppressions/${enc(workspaceUid)}?limit=200`);
+export const createSuppression = (workspaceUid: string, input: { email: string; note?: string }): Promise<Suppression> =>
+    apiFetch(`/mail/crm/suppressions/${enc(workspaceUid)}`, json("POST", input));
+export const deleteSuppression = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/suppressions/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+
+export const listForms = (workspaceUid: string): Promise<CrmForm[]> => apiFetch(`/mail/crm/forms/${enc(workspaceUid)}?limit=200`);
+export const createForm = (workspaceUid: string, input: Partial<CrmForm>): Promise<CrmForm> => apiFetch(`/mail/crm/forms/${enc(workspaceUid)}`, json("POST", input));
+export const updateForm = (workspaceUid: string, uid: string, input: Partial<CrmForm>): Promise<CrmForm> =>
+    apiFetch(`/mail/crm/forms/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteForm = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/forms/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+
 // Imports
 
 export const listImports = (workspaceUid: string): Promise<CrmImport[]> => apiFetch(`/mail/crm/imports/${enc(workspaceUid)}?limit=50`);
 export const getImport = (workspaceUid: string, uid: string): Promise<CrmImport> => apiFetch(`/mail/crm/imports/${enc(workspaceUid)}/${enc(uid)}`);
-export const startImport = (workspaceUid: string, uid: string, input: { mapping: ImportColumnMapping[]; updateExisting: boolean; tags: string[] }): Promise<CrmImport> =>
+export const startImport = (
+    workspaceUid: string,
+    uid: string,
+    input: { mapping: ImportColumnMapping[]; updateExisting: boolean; tags: string[]; listUid?: string },
+): Promise<CrmImport> =>
     apiFetch(`/mail/crm/imports/${enc(workspaceUid)}/${enc(uid)}/start`, json("POST", input));
 export const deleteImport = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/imports/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
 
