@@ -84,6 +84,9 @@ export function stubBasics(api: any, overrides: { workspaces?: any[] } = {}): vo
     api.campaignChecklist.mockResolvedValue([]);
     api.campaignAudience.mockResolvedValue({ count: 0, capped: false });
     api.campaignRecipients.mockResolvedValue({ items: [], total: 0 });
+    api.listSegments.mockResolvedValue([]);
+    api.listScoringRules.mockResolvedValue([]);
+    api.previewSegment.mockResolvedValue({ count: 0, capped: false, contacts: [] });
 }
 
 export function list(overrides: Record<string, unknown> = {}): any {
@@ -148,6 +151,8 @@ export function campaign(overrides: Record<string, unknown> = {}): any {
         senderUid: null,
         listUids: [],
         excludeListUids: [],
+        segmentUids: [],
+        excludeSegmentUids: [],
         trackOpens: true,
         trackClicks: true,
         abTest: null,
@@ -156,4 +161,24 @@ export function campaign(overrides: Record<string, unknown> = {}): any {
         ...stored,
         ...overrides,
     };
+}
+
+export function segment(overrides: Record<string, unknown> = {}): any {
+    return {
+        uid: "sg1",
+        workspaceUid: "w1",
+        name: "VIPs",
+        description: null,
+        kind: "dynamic",
+        filter: { field: "tags", op: "eq", value: "vip" },
+        memberCount: 3,
+        capped: false,
+        refreshedAt: "2026-09-30T10:00:00.000Z",
+        ...stored,
+        ...overrides,
+    };
+}
+
+export function scoringRule(overrides: Record<string, unknown> = {}): any {
+    return { uid: "r1", workspaceUid: "w1", name: "VIP", enabled: true, kind: "property", filter: { field: "tags", op: "eq", value: "vip" }, points: 20, ...stored, ...overrides };
 }

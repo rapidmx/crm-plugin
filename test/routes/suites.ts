@@ -11,6 +11,7 @@ import { importSuite } from "./importSuite.js";
 import { listSuite } from "./listSuite.js";
 import { templateSuite } from "./templateSuite.js";
 import { campaignSuite } from "./campaignSuite.js";
+import { segmentSuite } from "./segmentSuite.js";
 import { workspaceSuite } from "./workspaceSuite.js";
 
 export function runCrmSuites(ctx: CrmTestContext): void {
@@ -22,4 +23,5 @@ export function runCrmSuites(ctx: CrmTestContext): void {
     listSuite(ctx);
     templateSuite(ctx);
     campaignSuite(ctx);
+    segmentSuite(ctx);
 }

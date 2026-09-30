@@ -11,6 +11,8 @@ import {
     HiOutlineDocumentText,
     HiOutlineEnvelope,
     HiOutlinePaperAirplane,
+    HiOutlineFunnel,
+    HiOutlineChartBar,
     HiOutlineQueueList,
     HiOutlineUsers,
 } from "react-icons/hi2";
@@ -25,7 +27,7 @@ import { Workspace, createWorkspace, errorMessage, listWorkspaces } from "../crm
 export type CrmPageProps = Omit<AppShellProps, "active">;
 
 /** The CRM's sections, each a page under `/crm`. */
-export type CrmSection = "contacts" | "companies" | "lists" | "forms" | "templates" | "campaigns" | "tasks" | "imports" | "settings";
+export type CrmSection = "contacts" | "companies" | "lists" | "segments" | "forms" | "templates" | "campaigns" | "scoring" | "tasks" | "imports" | "settings";
 
 /** Where the selected workspace is remembered between visits (per browser). */
 export const WORKSPACE_STORAGE_KEY = "rapidmx.crm.workspace";
@@ -36,9 +38,11 @@ const SECTIONS: { id: CrmSection; label: string; path: string; icon: IconType }[
     { id: "contacts", label: "Contacts", path: "/crm", icon: HiOutlineUsers },
     { id: "companies", label: "Companies", path: "/crm/companies", icon: HiOutlineBuildingOffice2 },
     { id: "lists", label: "Lists", path: "/crm/lists", icon: HiOutlineQueueList },
+    { id: "segments", label: "Segments", path: "/crm/segments", icon: HiOutlineFunnel },
     { id: "forms", label: "Forms", path: "/crm/forms", icon: HiOutlineDocumentText },
     { id: "templates", label: "Templates", path: "/crm/templates", icon: HiOutlineEnvelope },
     { id: "campaigns", label: "Campaigns", path: "/crm/campaigns", icon: HiOutlinePaperAirplane },
+    { id: "scoring", label: "Lead scoring", path: "/crm/scoring", icon: HiOutlineChartBar },
     { id: "tasks", label: "Tasks", path: "/crm/tasks", icon: HiOutlineClipboardDocumentCheck },
     { id: "imports", label: "Import", path: "/crm/imports", icon: HiOutlineArrowUpTray },
     { id: "settings", label: "Settings", path: "/crm/settings", icon: HiOutlineCog6Tooth },

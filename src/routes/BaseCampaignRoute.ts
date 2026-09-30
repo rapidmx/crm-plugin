@@ -14,6 +14,7 @@ import {
     EmailTemplate,
     EngagementEvent,
     OutboundSend,
+    Segment,
     SendStatus,
     WorkspaceAction,
     WorkspaceSender,
@@ -77,6 +78,8 @@ export abstract class BaseCampaignRoute extends BaseWorkspaceRecordRoute<Campaig
             status: CampaignStatus.DRAFT,
             listUids: [],
             excludeListUids: [],
+            segmentUids: [],
+            excludeSegmentUids: [],
             trackOpens: true,
             trackClicks: true,
             audienceDone: false,
@@ -114,6 +117,11 @@ export abstract class BaseCampaignRoute extends BaseWorkspaceRecordRoute<Campaig
                 fields[field] = await this.readLists(workspaceUid, body[field], field);
             }
         }
+        for (const field of ["segmentUids", "excludeSegmentUids"] as const) {
+            if (body[field] !== undefined) {
+                fields[field] = await this.readSegments(workspaceUid, body[field], field);
+            }
+        }
         for (const field of ["trackOpens", "trackClicks"] as const) {
             const value: boolean | undefined = readBoolean(body, field);
             if (value !== undefined) {
@@ -134,6 +142,23 @@ export abstract class BaseCampaignRoute extends BaseWorkspaceRecordRoute<Campaig
         for (const uid of uids) {
             if (!(await this.findList(workspaceUid, uid))) {
                 throw badRequest(`'${field}' must hold lists of the workspace.`);
+            }
+        }
+        return uids;
+    }
+
+    private async readSegments(workspaceUid: string, raw: unknown, field: string): Promise<string[]> {
+        if (!Array.isArray(raw) || raw.length > MAX_CAMPAIGN_LISTS) {
+            throw badRequest(`'${field}' must be a list of at most ${MAX_CAMPAIGN_LISTS} segment uids.`);
+        }
+        const uids: string[] = [...new Set(raw)] as string[];
+        for (const uid of uids) {
+            const segment: Segment | undefined =
+                typeof uid === "string" && uid.length > 0 && uid.length <= 64
+                    ? await (await this.repo<Segment>("segment")).findOne(uid, { ignoreACL: true, skipCache: true })
+                    : undefined;
+            if (segment?.workspaceUid !== workspaceUid) {
+                throw badRequest(`'${field}' must hold segments of the workspace.`);
             }
         }
         return uids;
@@ -306,6 +331,8 @@ export abstract class BaseCampaignRoute extends BaseWorkspaceRecordRoute<Campaig
                 senderUid: campaign.senderUid ?? undefined,
                 listUids: campaign.listUids.filter(Boolean),
                 excludeListUids: campaign.excludeListUids,
+                segmentUids: campaign.segmentUids ?? [],
+                excludeSegmentUids: campaign.excludeSegmentUids ?? [],
                 trackOpens: campaign.trackOpens,
                 trackClicks: campaign.trackClicks,
                 abTest: campaign.abTest
@@ -324,6 +351,8 @@ export abstract class BaseCampaignRoute extends BaseWorkspaceRecordRoute<Campaig
             workspaceUid,
             listUids: await this.readLists(workspaceUid, request.listUids ?? [], "listUids"),
             excludeListUids: await this.readLists(workspaceUid, request.excludeListUids ?? [], "excludeListUids"),
+            segmentUids: await this.readSegments(workspaceUid, request.segmentUids ?? [], "segmentUids"),
+            excludeSegmentUids: await this.readSegments(workspaceUid, request.excludeSegmentUids ?? [], "excludeSegmentUids"),
         });
     }
 

@@ -60,8 +60,11 @@ export abstract class BaseWorkspaceRecordRoute<T extends WorkspaceRecord, V = T>
     /** The changed fields of `existing`, from an update request. */
     protected abstract readUpdate(body: Record<string, unknown>, existing: T, context: WriteContext): Promise<Partial<T>>;
 
-    /** Whatever a write changes besides the record itself (property values, the timeline...). `before` is unset on a create. */
-    protected async afterWrite(_record: T, _before: T | undefined, _body: Record<string, unknown>, _context: WriteContext): Promise<void> {
+    /**
+     * Whatever a write changes besides the record itself (property values, the timeline...). `before` is unset on a create. Returns the
+     * record as saved again, when the hook changed it too.
+     */
+    protected async afterWrite(_record: T, _before: T | undefined, _body: Record<string, unknown>, _context: WriteContext): Promise<T | void> {
         // Nothing by default.
     }
 
@@ -152,8 +155,8 @@ export abstract class BaseWorkspaceRecordRoute<T extends WorkspaceRecord, V = T>
         }
         const fields: Partial<T> = await this.readCreate(request, context);
         const modelClass: any = this.classes[this.model];
-        const record: T = await repo.create(new modelClass({ ...fields, workspaceUid }), { ignoreACL: true, skipPush: true });
-        await this.afterWrite(record, undefined, request, context);
+        const created: T = await repo.create(new modelClass({ ...fields, workspaceUid }), { ignoreACL: true, skipPush: true });
+        const record: T = (await this.afterWrite(created, undefined, request, context)) ?? created;
         const view: V = (await this.toViews([record], workspaceUid))[0];
         this.notify(workspaceUid, this.pushType, "create", view);
         return view;
@@ -171,8 +174,8 @@ export abstract class BaseWorkspaceRecordRoute<T extends WorkspaceRecord, V = T>
             ignoreACL: true,
             skipPush: true,
         });
-        await this.afterWrite(updated, existing, request, context);
-        const view: V = (await this.toViews([updated], workspaceUid))[0];
+        const saved: T = (await this.afterWrite(updated, existing, request, context)) ?? updated;
+        const view: V = (await this.toViews([saved], workspaceUid))[0];
         this.notify(workspaceUid, this.pushType, "update", view);
         return view;
     }

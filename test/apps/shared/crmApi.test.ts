@@ -196,6 +196,35 @@ describe("crmApi", () => {
         ]);
     });
 
+    it("calls each segment and scoring rule endpoint", async () => {
+        const calls = recordCalls(() => jsonResponse(200, {}));
+        const filter = { field: "tags", op: "eq", value: "vip" };
+        await api.listSegments("w");
+        await api.createSegment("w", { name: "S", filter });
+        await api.updateSegment("w", "s", { name: "T" });
+        await api.deleteSegment("w", "s");
+        await api.refreshSegment("w", "s");
+        await api.previewSegment("w", filter);
+        await api.listScoringRules("w");
+        await api.createScoringRule("w", { name: "R", kind: "property", filter, points: 5 });
+        await api.updateScoringRule("w", "r", { enabled: false });
+        await api.deleteScoringRule("w", "r");
+        await api.recalculateScores("w");
+        expect(calls).toEqual([
+            "GET /api/mail/crm/segments/w?limit=200",
+            'POST /api/mail/crm/segments/w {"name":"S","filter":{"field":"tags","op":"eq","value":"vip"}}',
+            'PUT /api/mail/crm/segments/w/s {"name":"T"}',
+            "DELETE /api/mail/crm/segments/w/s",
+            "POST /api/mail/crm/segments/w/s/refresh {}",
+            'POST /api/mail/crm/segments/w/preview {"filter":{"field":"tags","op":"eq","value":"vip"}}',
+            "GET /api/mail/crm/scoring-rules/w?limit=50",
+            'POST /api/mail/crm/scoring-rules/w {"name":"R","kind":"property","filter":{"field":"tags","op":"eq","value":"vip"},"points":5}',
+            'PUT /api/mail/crm/scoring-rules/w/r {"enabled":false}',
+            "DELETE /api/mail/crm/scoring-rules/w/r",
+            "POST /api/mail/crm/scoring-rules/w/recalculate {}",
+        ]);
+    });
+
     it("uploads a CSV file as the raw body and reads the answer", async () => {
         const fetchMock = mockFetch(() => jsonResponse(200, { import: { uid: "i" }, targets: [], preview: [] }));
         const file = new File(["email\na@x.example"], "people list.csv", { type: "text/csv" });

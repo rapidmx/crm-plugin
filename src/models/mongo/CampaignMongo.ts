@@ -63,6 +63,14 @@ export class CampaignMongo extends BaseMongoEntity implements Campaign {
     public excludeListUids: string[] = [];
 
     @Column()
+    @Description("Only subscribers in one of these segments get it.")
+    public segmentUids: string[] = [];
+
+    @Column()
+    @Description("Subscribers in these segments don't.")
+    public excludeSegmentUids: string[] = [];
+
+    @Column()
     @Description("Whether opens are tracked.")
     public trackOpens: boolean = true;
 
@@ -137,6 +145,8 @@ export class CampaignMongo extends BaseMongoEntity implements Campaign {
             this.senderUid = "senderUid" in other ? other.senderUid : this.senderUid;
             this.listUids = other.listUids !== undefined ? other.listUids : this.listUids;
             this.excludeListUids = other.excludeListUids !== undefined ? other.excludeListUids : this.excludeListUids;
+            this.segmentUids = other.segmentUids !== undefined ? other.segmentUids : this.segmentUids;
+            this.excludeSegmentUids = other.excludeSegmentUids !== undefined ? other.excludeSegmentUids : this.excludeSegmentUids;
             this.trackOpens = other.trackOpens !== undefined ? other.trackOpens : this.trackOpens;
             this.trackClicks = other.trackClicks !== undefined ? other.trackClicks : this.trackClicks;
             this.abTest = "abTest" in other ? other.abTest : this.abTest;

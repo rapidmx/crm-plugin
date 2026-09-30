@@ -159,6 +159,22 @@ Keep entries terse — this is a reference, not a transcript.
   `List-Unsubscribe` address.
 - **GDPR.** Deleting a contact deletes their sends and engagement events too. Deleting a workspace deletes every workspace model:
   Phase 2/3 models had been missing from `WORKSPACE_DATA`, fixed in Phase 4.
+- **Segments** (Phase 5). Membership is stored as `PropertyValue` rows with key `segments` (`stringValue` = the segment uid), exactly
+  like `lists`.
+  - So `segments` is a contact filter field for free, and deleting a contact removes its memberships with its values.
+  - A segment's own filter may not name `segments` (no loops).
+  - Membership is worked out on create, and when the filter or kind changes (`afterWrite` may now return the record as saved again).
+  - After that, `SegmentRefreshJob` refreshes dynamic segments, claiming each by stamping `refreshedAt`. Its `membersChanged()` hook
+    is where Phase 6's segment.entered/left triggers go.
+  - Segments are capped at `MAX_SEGMENT_SIZE` (100k).
+- **Lead scoring.** `ScoringRule` rules are either property (a filter) or activity (engagement events without machine opens, or
+  timeline kinds, within `withinDays`, capped at `maxPoints`). `scoreWorkspace()` recomputes every contact's `score`.
+  - `Workspace.scoringRules`, `scoringDirty` and `scoredAt` let `ScoringJob` find the workspaces to rescore. The rule route keeps them.
+  - Deleting every rule rescores everyone to 0.
+- **Paging.** `PAGING.size` in `segments/Segments.ts` is the page size of segments and scoring; tests shrink it to walk the pages.
+- **New columns on existing tables need a database default** (`@Column({ default })`). The schema is synchronized, not migrated, so a
+  NOT NULL column without one fails on a table that has rows (it did, on SQLite). `genmodels.py` takes an optional 6th field element
+  as the SQL default.
 
 ## Session Log
 
@@ -211,3 +227,13 @@ Keep entries terse — this is a reference, not a transcript.
   - The recipient count after a replayed page (see above).
 - **Not verified end to end:** real bounces, complaints and replies. They need restapi 0.27's stream and a server with an `events`
   datastore; the handler is tested directly and through a fake Redis.
+
+### 2026-09-30 — Phase 5: segments and lead scoring
+
+- **New models:** `Segment` and `ScoringRule`.
+- **New fields:** `Workspace.scoringRules`, `scoringDirty` and `scoredAt`; `Campaign.segmentUids` and `excludeSegmentUids`.
+- **New routes:** `segments` and `scoring-rules`.
+- **New jobs:** `SegmentRefreshJob` and `ScoringJob`.
+- **New UI pages:** `/crm/segments` and `/crm/scoring`. The contact list takes `?segment=` and offers segments as a filter field; the
+  campaign editor has segment pickers.
+- **Git:** JP added the remote (`origin`, `git@github.com:rapidmx/crm-plugin.git`) and asked for a push after each phase commit.

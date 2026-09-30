@@ -6,12 +6,18 @@ import * as crypto from "crypto";
 import { ModelUtils } from "@rapidrest/service-core";
 import type { CrmRepos } from "../models/CrmModelClasses.js";
 import { AbTest, CrmContact, EmailStatus, Subscription, SubscriptionStatus, Suppression } from "../models/types.js";
+import { inSegments } from "../segments/Segments.js";
 
-/** Who a campaign goes to: the subscribers of `listUids`, less those of `excludeListUids`. */
+/**
+ * Who a campaign goes to: the subscribers of `listUids`, less those of `excludeListUids`; when `segmentUids` isn't empty, only those
+ * in one of those segments; and never those in `excludeSegmentUids`.
+ */
 export interface AudienceSpec {
     workspaceUid: string;
     listUids: string[];
     excludeListUids: string[];
+    segmentUids?: string[];
+    excludeSegmentUids?: string[];
 }
 
 /** One page of an audience. */
@@ -65,12 +71,18 @@ export async function audiencePage(repos: CrmRepos, spec: AudienceSpec, cursor: 
             { ignoreACL: true, limit: contactUids.length, skipCache: true },
         )
     ).filter((contact) => contact.emailStatus === EmailStatus.ACTIVE && !excluded.has(contact.uid));
+    const uids: string[] = contacts.map((contact) => contact.uid);
+    const wanted: Set<string> | undefined = spec.segmentUids?.length ? await inSegments(repos, spec.segmentUids, uids) : undefined;
+    const unwanted: Set<string> = await inSegments(repos, spec.excludeSegmentUids ?? [], uids);
     const suppressed: Set<string> = await suppressedAmong(
         repos,
         spec.workspaceUid,
         contacts.map((contact) => contact.email),
     );
-    return { contacts: contacts.filter((contact) => !suppressed.has(contact.email)), nextCursor };
+    return {
+        contacts: contacts.filter((contact) => !suppressed.has(contact.email) && (!wanted || wanted.has(contact.uid)) && !unwanted.has(contact.uid)),
+        nextCursor,
+    };
 }
 
 /** Which of `emails` the workspace has suppressed. */

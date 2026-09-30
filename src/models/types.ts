@@ -48,6 +48,12 @@ export interface Workspace extends CrmEntity {
     website?: string;
     /** The user who created it. */
     createdByUserUid: string;
+    /** How many lead scoring rules the workspace has (`BaseScoringRuleRoute` keeps it), so the scoring job only visits workspaces with some. */
+    scoringRules: number;
+    /** The rules changed since contacts were last scored. */
+    scoringDirty: boolean;
+    /** When contacts were last scored. */
+    scoredAt?: Date;
 }
 
 /** A user's membership of a workspace. Unique per workspace and user. */
@@ -527,6 +533,10 @@ export interface Campaign extends CrmEntity {
     listUids: string[];
     /** Lists whose subscribers don't, even when on one of `listUids`. */
     excludeListUids: string[];
+    /** When not empty, only subscribers in one of these segments get it. */
+    segmentUids: string[];
+    /** Subscribers in these segments don't get it. */
+    excludeSegmentUids: string[];
     /** Adds an invisible image that reports opens. */
     trackOpens: boolean;
     /** Sends links through a redirect that reports clicks. */
@@ -636,4 +646,67 @@ export interface EngagementEvent extends CrmEntity {
     occurredAt: Date;
     /** Type-specific details: a click's `url` and `index`, an open's `machine`, a bounce's `status` and `bounceType`. */
     data: Record<string, unknown>;
+}
+
+/** How a segment's members are kept. */
+export enum SegmentKind {
+    /** Recomputed from its filter as contacts change (`SegmentRefreshJob`). */
+    DYNAMIC = "dynamic",
+    /** The contacts that matched when it was made (or last refreshed by hand). */
+    STATIC = "static",
+}
+
+/**
+ * A named group of contacts, defined by a filter. Its members are `PropertyValue` rows (key `segments`, the segment's uid), so any
+ * contact filter can name segments - `{ field: "segments", op: "eq", value: segmentUid }` - and campaigns can aim at them.
+ */
+export interface Segment extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    description?: string;
+    kind: SegmentKind;
+    /** A contact filter (`filters/Filter.ts`), which may not itself name segments. */
+    filter: unknown;
+    memberCount: number;
+    /** The filter matched more contacts than a segment may hold; only the first were kept. */
+    capped: boolean;
+    refreshedAt?: Date;
+    createdByUserUid: string;
+}
+
+/** What a scoring rule scores. */
+export enum ScoringKind {
+    /** Contacts matching a filter get the points once. */
+    PROPERTY = "property",
+    /** Contacts get the points for each time they did something (within `withinDays`), up to `maxPoints`. */
+    ACTIVITY = "activity",
+}
+
+/** What an activity scoring rule counts. */
+export enum ScoringActivity {
+    OPENED = "opened",
+    CLICKED = "clicked",
+    REPLIED = "replied",
+    FORM_SUBMITTED = "form_submitted",
+    SUBSCRIBED = "subscribed",
+    UNSUBSCRIBED = "unsubscribed",
+    BOUNCED = "bounced",
+}
+
+/** One rule of a workspace's lead scoring; a contact's `score` is the sum of every enabled rule's points for them. */
+export interface ScoringRule extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    enabled: boolean;
+    kind: ScoringKind;
+    /** A contact filter, for a property rule. */
+    filter?: unknown;
+    /** What an activity rule counts. */
+    activity?: ScoringActivity;
+    /** Points per match (property) or per time (activity); negative takes points away. */
+    points: number;
+    /** An activity rule's points count up to this (in absolute value). None: no limit. */
+    maxPoints?: number;
+    /** An activity rule counts only what happened in these last days. None: ever. */
+    withinDays?: number;
 }

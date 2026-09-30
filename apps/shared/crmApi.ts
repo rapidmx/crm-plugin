@@ -581,6 +581,8 @@ export interface Campaign extends Stored {
     senderUid?: string | null;
     listUids: string[];
     excludeListUids: string[];
+    segmentUids: string[];
+    excludeSegmentUids: string[];
     trackOpens: boolean;
     trackClicks: boolean;
     abTest?: AbTest | null;
@@ -630,7 +632,9 @@ export interface CampaignReport {
     links: LinkClicks[];
 }
 
-export type CampaignInput = Partial<Pick<Campaign, "name" | "templateUid" | "senderUid" | "listUids" | "excludeListUids" | "trackOpens" | "trackClicks" | "abTest" | "version">>;
+export type CampaignInput = Partial<
+    Pick<Campaign, "name" | "templateUid" | "senderUid" | "listUids" | "excludeListUids" | "segmentUids" | "excludeSegmentUids" | "trackOpens" | "trackClicks" | "abTest" | "version">
+>;
 
 const campaignPath = (workspaceUid: string, suffix: string = "") => `/mail/crm/campaigns/${enc(workspaceUid)}${suffix}`;
 
@@ -649,7 +653,10 @@ export const scheduleCampaign = (workspaceUid: string, uid: string, sendAt?: str
 /** Moves a campaign along: back to a draft, paused, resumed or cancelled. */
 export const changeCampaign = (workspaceUid: string, uid: string, action: "unschedule" | "pause" | "resume" | "cancel"): Promise<Campaign> =>
     apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/${action}`), json("POST", {}));
-export const campaignAudience = (workspaceUid: string, input: { listUids: string[]; excludeListUids: string[] }): Promise<{ count: number; capped: boolean }> =>
+export const campaignAudience = (
+    workspaceUid: string,
+    input: { listUids: string[]; excludeListUids: string[]; segmentUids?: string[]; excludeSegmentUids?: string[] },
+): Promise<{ count: number; capped: boolean }> =>
     apiFetch(campaignPath(workspaceUid, "/audience"), json("POST", input));
 export const campaignReport = (workspaceUid: string, uid: string): Promise<CampaignReport> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/report`));
 export const campaignRecipients = (
@@ -657,3 +664,61 @@ export const campaignRecipients = (
     uid: string,
     query: { status?: SendStatus; engagement?: string; q?: string; page: number; limit?: number },
 ): Promise<SearchResult<CampaignRecipient>> => apiFetch(campaignPath(workspaceUid, `/${enc(uid)}/recipients`), json("POST", query));
+
+// Segments and lead scoring
+
+export type SegmentKind = "dynamic" | "static";
+
+export interface Segment extends Stored {
+    workspaceUid: string;
+    name: string;
+    description?: string | null;
+    kind: SegmentKind;
+    filter: FilterNode;
+    memberCount: number;
+    capped: boolean;
+    refreshedAt?: string | null;
+}
+
+export interface SegmentPreview {
+    count: number;
+    capped: boolean;
+    contacts: Pick<Contact, "uid" | "email" | "firstName" | "lastName">[];
+}
+
+export type ScoringKind = "property" | "activity";
+export type ScoringActivity = "opened" | "clicked" | "replied" | "form_submitted" | "subscribed" | "unsubscribed" | "bounced";
+
+export interface ScoringRule extends Stored {
+    workspaceUid: string;
+    name: string;
+    enabled: boolean;
+    kind: ScoringKind;
+    filter?: FilterNode | null;
+    activity?: ScoringActivity | null;
+    points: number;
+    maxPoints?: number | null;
+    withinDays?: number | null;
+}
+
+export type SegmentInput = Partial<Pick<Segment, "name" | "description" | "kind" | "filter">>;
+export type ScoringRuleInput = Partial<Pick<ScoringRule, "name" | "enabled" | "kind" | "filter" | "activity" | "points" | "maxPoints" | "withinDays">>;
+
+export const listSegments = (workspaceUid: string): Promise<Segment[]> => apiFetch(`/mail/crm/segments/${enc(workspaceUid)}?limit=200`);
+export const createSegment = (workspaceUid: string, input: SegmentInput): Promise<Segment> => apiFetch(`/mail/crm/segments/${enc(workspaceUid)}`, json("POST", input));
+export const updateSegment = (workspaceUid: string, uid: string, input: SegmentInput): Promise<Segment> =>
+    apiFetch(`/mail/crm/segments/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteSegment = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/segments/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+export const refreshSegment = (workspaceUid: string, uid: string): Promise<Segment> => apiFetch(`/mail/crm/segments/${enc(workspaceUid)}/${enc(uid)}/refresh`, json("POST", {}));
+export const previewSegment = (workspaceUid: string, filter: FilterNode): Promise<SegmentPreview> =>
+    apiFetch(`/mail/crm/segments/${enc(workspaceUid)}/preview`, json("POST", { filter }));
+
+export const listScoringRules = (workspaceUid: string): Promise<ScoringRule[]> => apiFetch(`/mail/crm/scoring-rules/${enc(workspaceUid)}?limit=50`);
+export const createScoringRule = (workspaceUid: string, input: ScoringRuleInput): Promise<ScoringRule> =>
+    apiFetch(`/mail/crm/scoring-rules/${enc(workspaceUid)}`, json("POST", input));
+export const updateScoringRule = (workspaceUid: string, uid: string, input: ScoringRuleInput): Promise<ScoringRule> =>
+    apiFetch(`/mail/crm/scoring-rules/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteScoringRule = (workspaceUid: string, uid: string): Promise<void> =>
+    apiFetch(`/mail/crm/scoring-rules/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+export const recalculateScores = (workspaceUid: string): Promise<{ changed: number }> =>
+    apiFetch(`/mail/crm/scoring-rules/${enc(workspaceUid)}/recalculate`, json("POST", {}));

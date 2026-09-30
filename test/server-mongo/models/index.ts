@@ -23,3 +23,5 @@ export { SavedBlockMongo } from "../../../src/models/mongo/SavedBlockMongo.js";
 export { CampaignMongo } from "../../../src/models/mongo/CampaignMongo.js";
 export { OutboundSendMongo } from "../../../src/models/mongo/OutboundSendMongo.js";
 export { EngagementEventMongo } from "../../../src/models/mongo/EngagementEventMongo.js";
+export { SegmentMongo } from "../../../src/models/mongo/SegmentMongo.js";
+export { ScoringRuleMongo } from "../../../src/models/mongo/ScoringRuleMongo.js";

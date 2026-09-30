@@ -19,6 +19,8 @@ import { OutboundSendSQL } from "./OutboundSendSQL.js";
 import { PropertyDefinitionSQL } from "./PropertyDefinitionSQL.js";
 import { PropertyValueSQL } from "./PropertyValueSQL.js";
 import { SavedBlockSQL } from "./SavedBlockSQL.js";
+import { ScoringRuleSQL } from "./ScoringRuleSQL.js";
+import { SegmentSQL } from "./SegmentSQL.js";
 import { SubscriptionSQL } from "./SubscriptionSQL.js";
 import { SuppressionSQL } from "./SuppressionSQL.js";
 import { TimelineEventSQL } from "./TimelineEventSQL.js";
@@ -49,5 +51,7 @@ export const SQL_MODELS: CrmModelClasses = {
     campaign: CampaignSQL,
     outboundSend: OutboundSendSQL,
     engagementEvent: EngagementEventSQL,
+    segment: SegmentSQL,
+    scoringRule: ScoringRuleSQL,
     mailbox: MailboxSQL,
 };

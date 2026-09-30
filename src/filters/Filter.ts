@@ -117,8 +117,8 @@ export function propertyValueType(type: PropertyType): FilterValueType {
 }
 
 /**
- * Every field a filter on `objectType` records may name: the record's own `fields`, `tags`, `lists` for contacts (the uids of the
- * lists they are subscribed to), and `properties.<key>` for each of the workspace's custom property `definitions` of that type.
+ * Every field a filter on `objectType` records may name: the record's own `fields`, `tags`, `lists` and `segments` for contacts (the
+ * uids of the lists they are subscribed to and the segments they are in), and `properties.<key>` for each of the workspace's custom property `definitions` of that type.
  */
 export function filterFields(
     fields: Readonly<Record<string, FilterField>>,
@@ -128,6 +128,7 @@ export function filterFields(
     const result: Record<string, FilterField> = { ...fields, tags: { type: "string", stored: "values", multi: true, key: "tags" } };
     if (objectType === CrmObjectType.CONTACT) {
         result.lists = { type: "string", stored: "values", multi: true, key: "lists" };
+        result.segments = { type: "string", stored: "values", multi: true, key: "segments" };
     }
     for (const definition of definitions) {
         if (definition.objectType !== objectType) {

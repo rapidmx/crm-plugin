@@ -4,7 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 import React from "react";
 import { HiOutlineXMark } from "react-icons/hi2";
-import { FilterCondition, FilterNode } from "../crmApi.js";
+import { FilterCondition, FilterGroup, FilterNode } from "../crmApi.js";
 import { FieldInfo, OPERATORS } from "../fields.js";
 import { INPUT_CLASS } from "./CrmShell.js";
 
@@ -63,6 +63,28 @@ export function buildFilter(draft: FilterDraft, fields: FieldInfo[]): FilterNode
         return undefined;
     }
     return conditions.length === 1 ? conditions[0] : { [draft.match]: conditions };
+}
+
+/**
+ * The draft of an API filter `buildFilter()` made - a condition, or an `and`/`or` group of conditions - for editing it again. Dates
+ * come back as their day; anything deeper than one group is left out.
+ */
+export function draftOf(filter: FilterNode | null | undefined): FilterDraft {
+    if (!filter) {
+        return EMPTY_FILTER;
+    }
+    const match: "and" | "or" = "or" in filter && filter.or ? "or" : "and";
+    const nodes: FilterNode[] = "field" in filter ? [filter] : ((filter)[match] ?? []);
+    return {
+        match,
+        conditions: nodes
+            .filter((node): node is FilterCondition => "field" in node)
+            .map((node) => ({
+                field: node.field,
+                op: node.op,
+                value: node.value === undefined || node.value === null ? "" : typeof node.value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(node.value) ? node.value.slice(0, 10) : String(node.value),
+            })),
+    };
 }
 
 /** A new condition on `field`, with its kind's first comparison. */

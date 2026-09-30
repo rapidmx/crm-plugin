@@ -57,6 +57,8 @@ const MODELS: [string, string, string, string[], boolean][] = [
         false,
     ],
     ["EngagementEvent", "engagement_event", "CrmEngagementEvent", ["crm_engagement_source", "crm_engagement_contact", "crm_engagement_send", "crm_engagement_workspace"], false],
+    ["Segment", "segment", "CrmSegment", ["crm_segment_workspace", "crm_segment_refresh"], false],
+    ["ScoringRule", "scoring_rule", "CrmScoringRule", ["crm_scoring_workspace"], false],
 ];
 
 const ROUTES: [string, string][] = [
@@ -77,6 +79,8 @@ const ROUTES: [string, string][] = [
     ["SavedBlock", "saved-blocks"],
     ["Campaign", "campaigns"],
     ["Tracking", "t"],
+    ["Segment", "segments"],
+    ["ScoringRule", "scoring-rules"],
 ];
 
 describe("plugin entry points", () => {
@@ -89,6 +93,8 @@ describe("plugin entry points", () => {
             [`CampaignJob${suffix}`]: "job",
             [`SendDispatchJob${suffix}`]: "job",
             [`CrmMailEventJob${suffix}`]: "job",
+            [`SegmentRefreshJob${suffix}`]: "job",
+            [`ScoringJob${suffix}`]: "job",
         };
         for (const [model] of MODELS) {
             expected[`${model}${suffix}`] = `model ${datastore}${model === "WorkspaceSender" ? " mailbox-scoped" : ""}`;

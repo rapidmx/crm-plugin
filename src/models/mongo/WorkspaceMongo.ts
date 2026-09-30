@@ -57,6 +57,19 @@ export class WorkspaceMongo extends BaseMongoEntity implements Workspace {
     @Description("The user who created the workspace.")
     public createdByUserUid: string = "";
 
+    @Column()
+    @Description("How many lead scoring rules the workspace has.")
+    public scoringRules: number = 0;
+
+    @Column()
+    @Description("Whether the scoring rules changed since contacts were scored.")
+    public scoringDirty: boolean = false;
+
+    @Column({ nullable: true })
+    @Description("When contacts were last scored.")
+    @Nullable
+    public scoredAt?: Date;
+
     constructor(other?: Partial<WorkspaceMongo>) {
         super(other);
 
@@ -67,6 +80,9 @@ export class WorkspaceMongo extends BaseMongoEntity implements Workspace {
             this.postalAddress = "postalAddress" in other ? other.postalAddress : this.postalAddress;
             this.website = "website" in other ? other.website : this.website;
             this.createdByUserUid = other.createdByUserUid !== undefined ? other.createdByUserUid : this.createdByUserUid;
+            this.scoringRules = other.scoringRules !== undefined ? other.scoringRules : this.scoringRules;
+            this.scoringDirty = other.scoringDirty !== undefined ? other.scoringDirty : this.scoringDirty;
+            this.scoredAt = "scoredAt" in other ? other.scoredAt : this.scoredAt;
         }
     }
 }

@@ -21,6 +21,8 @@ import {
     listProperties,
     searchRecords,
     setSubscriptions,
+    Segment,
+    listSegments,
 } from "../crmApi.js";
 import { FieldInfo, fieldValue, formatValue, recordFields } from "../fields.js";
 import { INPUT_CLASS, useCrm } from "./CrmShell.js";
@@ -67,9 +69,10 @@ export default function RecordList({ objectType }: { objectType: CrmObjectType }
     const [creating, setCreating] = useState(false);
     const [tagAction, setTagAction] = useState<"addTags" | "removeTags" | null>(null);
     const [lists, setLists] = useState<MailingList[]>([]);
+    const [segments, setSegments] = useState<Segment[]>([]);
     const [listAction, setListAction] = useState<"subscribed" | "unsubscribed" | null>(null);
 
-    const fields: FieldInfo[] = useMemo(() => recordFields(objectType, definitions, lists), [objectType, definitions, lists]);
+    const fields: FieldInfo[] = useMemo(() => recordFields(objectType, definitions, lists, segments), [objectType, definitions, lists, segments]);
     const columns: FieldInfo[] = COLUMNS[objectType].map((name) => fields.find((field) => field.name === name)!);
     const request: SearchRequest = { q: query.trim() || undefined, filter: buildFilter(draft, fields), sort };
 
@@ -81,10 +84,15 @@ export default function RecordList({ objectType }: { objectType: CrmObjectType }
             listLists(workspace.uid)
                 .then(setLists)
                 .catch(() => setLists([]));
-            // `?list=<uid>` (the Lists page's "Subscribers" link) opens the list's subscribers.
-            const listUid: string | null = new URLSearchParams(window.location.search).get("list");
-            if (listUid) {
-                setDraft({ match: "and", conditions: [{ field: "lists", op: "eq", value: listUid }] });
+            listSegments(workspace.uid)
+                .then(setSegments)
+                .catch(() => setSegments([]));
+            // `?list=<uid>` (the Lists page's "Subscribers" link) opens the list's subscribers; `?segment=<uid>` a segment's members.
+            const params = new URLSearchParams(window.location.search);
+            const listUid: string | null = params.get("list");
+            const segmentUid: string | null = params.get("segment");
+            if (listUid || segmentUid) {
+                setDraft({ match: "and", conditions: [{ field: listUid ? "lists" : "segments", op: "eq", value: (listUid ?? segmentUid)! }] });
                 setFilterOpen(true);
             }
         }

@@ -49,7 +49,17 @@ This first release covers the CRM core:
   - Everything lands on the contact's timeline and in the campaign's report: rates, links by clicks, variants, and a filterable
     recipients list.
 
-Automations, segments and sales pipelines follow in later releases.
+- **Segments**: named groups of contacts defined by a filter.
+  - A dynamic segment keeps up with its filter by itself; a static one is a snapshot, refreshed by hand.
+  - Segments are a contact filter field of their own.
+  - A campaign can go only to the subscribers in some segments, or leave the members of others out.
+- **Lead scoring**: a contact's score is the sum of its workspace's rules.
+  - A property rule gives points to the contacts matching its filter.
+  - An activity rule gives points for each time a contact opened, clicked, replied, bounced, submitted a form, subscribed or
+    unsubscribed, optionally within the last N days and up to a limit.
+  - Scores update in the background, or on demand.
+
+Automations and sales pipelines follow in later releases.
 
 ## Installing
 
@@ -78,6 +88,8 @@ Replies, bounces and complaints are learned from restapi's mail event stream, so
 | `mail:crm:jobs:send:schedule`, `...:batch`, `...:lease_seconds`, `...:max_attempts` | `*/2 * * * * *`, `200`, `300`, `5` | How the dispatcher runs and retries. |
 | `mail:crm:jobs:campaign:schedule`, `...:lease_seconds`, `...:pages_per_run`, `...:page_size`, `...:stats_seconds` | `*/5 * * * * *`, `120`, `20`, `500`, `60` | How campaigns are prepared and their stats counted. |
 | `mail:crm:jobs:events:schedule` | `*/2 * * * * *` | How often the mail event stream is read. |
+| `mail:crm:jobs:segments:schedule`, `...:refresh_seconds`, `...:batch` | `0 * * * * *`, `300`, `20` | How dynamic segments are kept current. |
+| `mail:crm:jobs:scoring:schedule`, `...:interval_seconds`, `...:batch` | `30 * * * * *`, `3600`, `5` | How lead scores are kept current. |
 
 ## API
 
@@ -97,6 +109,8 @@ A deployment administrator has no access to a workspace they aren't a member of.
 | `templates` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `GET /:workspaceUid/merge-tags`, `POST /:workspaceUid/render`, `POST /:workspaceUid/:uid/test`, `POST /:workspaceUid/:uid/duplicate` |
 | `saved-blocks` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` |
 | `campaigns` | `GET /:workspaceUid`, `POST /:workspaceUid/search`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/audience`, `GET /:workspaceUid/:uid/checklist`, `POST /:workspaceUid/:uid/schedule` (`{ sendAt? }`), `POST /:workspaceUid/:uid/unschedule\|pause\|resume\|cancel\|duplicate`, `GET /:workspaceUid/:uid/report`, `POST /:workspaceUid/:uid/recipients` |
+| `segments` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/preview` (`{ filter }`), `POST /:workspaceUid/:uid/refresh` |
+| `scoring-rules` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` (admins), `POST /:workspaceUid/recalculate` |
 | `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `GET/POST /unsubscribe/:token` |
 | `t` (anonymous) | `GET /o/:token` (open image), `GET /c/:token/:index?u=&s=` (tracked link) |
 

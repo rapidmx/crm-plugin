@@ -30,6 +30,8 @@ export interface CrmModelClasses {
     campaign: any;
     outboundSend: any;
     engagementEvent: any;
+    segment: any;
+    scoringRule: any;
     /** `@rapidmx/restapi`'s `Mailbox`. */
     mailbox: any;
 }

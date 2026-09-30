@@ -23,3 +23,5 @@ export { SavedBlockSQL } from "../../../src/models/sql/SavedBlockSQL.js";
 export { CampaignSQL } from "../../../src/models/sql/CampaignSQL.js";
 export { OutboundSendSQL } from "../../../src/models/sql/OutboundSendSQL.js";
 export { EngagementEventSQL } from "../../../src/models/sql/EngagementEventSQL.js";
+export { SegmentSQL } from "../../../src/models/sql/SegmentSQL.js";
+export { ScoringRuleSQL } from "../../../src/models/sql/ScoringRuleSQL.js";

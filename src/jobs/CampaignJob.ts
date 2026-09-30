@@ -125,7 +125,13 @@ export abstract class CampaignJob extends CrmJobBase {
     private async preparePage(campaign: Campaign): Promise<Campaign | undefined> {
         const page: AudiencePage = await audiencePage(
             this.repos(),
-            { workspaceUid: campaign.workspaceUid, listUids: campaign.listUids, excludeListUids: campaign.excludeListUids },
+            {
+                workspaceUid: campaign.workspaceUid,
+                listUids: campaign.listUids,
+                excludeListUids: campaign.excludeListUids,
+                segmentUids: campaign.segmentUids ?? [],
+                excludeSegmentUids: campaign.excludeSegmentUids ?? [],
+            },
             campaign.audienceCursor ?? undefined,
             this.audiencePageSize,
         );

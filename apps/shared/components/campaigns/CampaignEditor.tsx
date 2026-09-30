@@ -12,6 +12,7 @@ import {
     CampaignProblem,
     EmailTemplate,
     MailingList,
+    Segment,
     WorkspaceSender,
     campaignAudience,
     campaignChecklist,
@@ -19,6 +20,7 @@ import {
     errorMessage,
     getTemplate,
     listLists,
+    listSegments,
     listSenders,
     scheduleCampaign,
     searchTemplates,
@@ -36,6 +38,8 @@ interface Draft {
     templateUid: string;
     listUids: string[];
     excludeListUids: string[];
+    segmentUids: string[];
+    excludeSegmentUids: string[];
     trackOpens: boolean;
     trackClicks: boolean;
     abTest: AbTest | null;
@@ -48,6 +52,8 @@ function draftOf(campaign: Campaign): Draft {
         templateUid: campaign.templateUid ?? "",
         listUids: campaign.listUids,
         excludeListUids: campaign.excludeListUids,
+        segmentUids: campaign.segmentUids ?? [],
+        excludeSegmentUids: campaign.excludeSegmentUids ?? [],
         trackOpens: campaign.trackOpens,
         trackClicks: campaign.trackClicks,
         abTest: campaign.abTest ?? null,
@@ -70,8 +76,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     );
 }
 
-/** Checkboxes for a set of lists. */
-function ListPicker({ label, lists, chosen, onChange }: { label: string; lists: MailingList[]; chosen: string[]; onChange: (uids: string[]) => void }) {
+/** Checkboxes for a set of lists or segments. */
+function ListPicker({ label, lists, chosen, onChange }: { label: string; lists: { uid: string; name: string }[]; chosen: string[]; onChange: (uids: string[]) => void }) {
     return (
         <fieldset className="mb-3">
             <legend className="text-xs font-semibold text-text-muted mb-1">{label}</legend>
@@ -105,6 +111,7 @@ export default function CampaignEditor({ campaign, onChanged }: { campaign: Camp
     const [draft, setDraft] = useState<Draft>(() => draftOf(campaign));
     const [dirty, setDirty] = useState(false);
     const [lists, setLists] = useState<MailingList[]>([]);
+    const [segments, setSegments] = useState<Segment[]>([]);
     const [senders, setSenders] = useState<WorkspaceSender[]>([]);
     const [templates, setTemplates] = useState<EmailTemplate[]>([]);
     const [audience, setAudience] = useState<{ count: number; capped: boolean } | null>(null);
@@ -118,6 +125,7 @@ export default function CampaignEditor({ campaign, onChanged }: { campaign: Camp
 
     useEffect(() => {
         listLists(workspace.uid).then(setLists, () => setLists([]));
+        listSegments(workspace.uid).then(setSegments, () => setSegments([]));
         listSenders(workspace.uid).then(setSenders, () => setSenders([]));
         searchTemplates(workspace.uid, 0, 200).then(
             (result) => setTemplates(result.items),
@@ -135,14 +143,19 @@ export default function CampaignEditor({ campaign, onChanged }: { campaign: Camp
             return;
         }
         let current = true;
-        campaignAudience(workspace.uid, { listUids: draft.listUids, excludeListUids: draft.excludeListUids }).then(
+        campaignAudience(workspace.uid, {
+            listUids: draft.listUids,
+            excludeListUids: draft.excludeListUids,
+            segmentUids: draft.segmentUids,
+            excludeSegmentUids: draft.excludeSegmentUids,
+        }).then(
             (result) => current && setAudience(result),
             () => current && setAudience(null),
         );
         return () => {
             current = false;
         };
-    }, [draft.listUids.join(","), draft.excludeListUids.join(",")]);
+    }, [draft.listUids.join(","), draft.excludeListUids.join(","), draft.segmentUids.join(","), draft.excludeSegmentUids.join(",")]);
 
     function change(patch: Partial<Draft>): void {
         setDraft({ ...draft, ...patch });
@@ -165,6 +178,8 @@ export default function CampaignEditor({ campaign, onChanged }: { campaign: Camp
                 templateUid: draft.templateUid || null,
                 listUids: draft.listUids,
                 excludeListUids: draft.excludeListUids,
+                segmentUids: draft.segmentUids,
+                excludeSegmentUids: draft.excludeSegmentUids,
                 trackOpens: draft.trackOpens,
                 trackClicks: draft.trackClicks,
                 abTest: draft.abTest,
@@ -275,6 +290,22 @@ export default function CampaignEditor({ campaign, onChanged }: { campaign: Camp
                         chosen={draft.excludeListUids}
                         onChange={(excludeListUids) => change({ excludeListUids })}
                     />
+                    {segments.length > 0 && (
+                        <>
+                            <ListPicker
+                                label="Only those in the segments"
+                                lists={segments.filter((segment) => !draft.excludeSegmentUids.includes(segment.uid))}
+                                chosen={draft.segmentUids}
+                                onChange={(segmentUids) => change({ segmentUids })}
+                            />
+                            <ListPicker
+                                label="Never those in the segments"
+                                lists={segments.filter((segment) => !draft.segmentUids.includes(segment.uid))}
+                                chosen={draft.excludeSegmentUids}
+                                onChange={(excludeSegmentUids) => change({ excludeSegmentUids })}
+                            />
+                        </>
+                    )}
                     <p role="status" className="text-sm text-text-muted">
                         {audience
                             ? `Reaches ${audience.capped ? "more than " : ""}${audience.count.toLocaleString()} ${audience.count === 1 ? "contact" : "contacts"} right now.`

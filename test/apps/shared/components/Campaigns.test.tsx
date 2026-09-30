@@ -177,6 +177,8 @@ describe("CampaignEditor", () => {
             templateUid: "t1",
             listUids: ["l1"],
             excludeListUids: [],
+            segmentUids: [],
+            excludeSegmentUids: [],
             trackOpens: false,
             trackClicks: false,
             abTest: null,

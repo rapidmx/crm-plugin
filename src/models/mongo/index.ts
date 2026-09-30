@@ -19,6 +19,8 @@ import { OutboundSendMongo } from "./OutboundSendMongo.js";
 import { PropertyDefinitionMongo } from "./PropertyDefinitionMongo.js";
 import { PropertyValueMongo } from "./PropertyValueMongo.js";
 import { SavedBlockMongo } from "./SavedBlockMongo.js";
+import { ScoringRuleMongo } from "./ScoringRuleMongo.js";
+import { SegmentMongo } from "./SegmentMongo.js";
 import { SubscriptionMongo } from "./SubscriptionMongo.js";
 import { SuppressionMongo } from "./SuppressionMongo.js";
 import { TimelineEventMongo } from "./TimelineEventMongo.js";
@@ -49,5 +51,7 @@ export const MONGO_MODELS: CrmModelClasses = {
     campaign: CampaignMongo,
     outboundSend: OutboundSendMongo,
     engagementEvent: EngagementEventMongo,
+    segment: SegmentMongo,
+    scoringRule: ScoringRuleMongo,
     mailbox: MailboxMongo,
 };
