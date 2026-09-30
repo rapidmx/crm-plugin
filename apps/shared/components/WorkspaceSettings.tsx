@@ -30,6 +30,7 @@ import {
     removeSender,
     updateMember,
     updateWorkspace,
+    updateSender,
 } from "../crmApi.js";
 import { INPUT_CLASS, WORKSPACE_STORAGE_KEY, useCrm } from "./CrmShell.js";
 
@@ -253,6 +254,22 @@ function Senders() {
                         <span className="flex-1">
                             {sender.fromName} &lt;{sender.fromAddress}&gt;
                         </span>
+                        <label className="flex items-center gap-1 text-xs text-text-muted" title="Mail this mailbox exchanges with contacts goes on their timelines">
+                            <input
+                                type="checkbox"
+                                disabled={!canManage}
+                                checked={!!sender.logEmail}
+                                onChange={async (event) => {
+                                    try {
+                                        await updateSender(workspace.uid, sender.uid, { logEmail: event.target.checked });
+                                    } catch (err) {
+                                        setError(errorMessage(err, "Could not change the sender."));
+                                    }
+                                    await load();
+                                }}
+                            />
+                            Log email with contacts
+                        </label>
                         {canManage && (
                             <button
                                 type="button"

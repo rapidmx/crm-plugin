@@ -36,6 +36,8 @@ export interface CrmModelClasses {
     automationVersion: any;
     enrollment: any;
     crmEvent: any;
+    pipeline: any;
+    deal: any;
     /** `@rapidmx/restapi`'s `Mailbox`. */
     mailbox: any;
 }

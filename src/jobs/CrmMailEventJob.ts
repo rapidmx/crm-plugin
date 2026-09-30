@@ -5,7 +5,7 @@
 import os from "node:os";
 import { ObjectDecorators } from "@rapidrest/core";
 import { ConnectionManager, ModelUtils, RepoUtils } from "@rapidrest/service-core";
-import { EngagementType, OutboundSend, WorkspaceSender } from "../models/types.js";
+import { CrmContact, CrmObjectType, EngagementType, OutboundSend, TimelineEvent, TimelineKind, WorkspaceSender } from "../models/types.js";
 import { EngagementRecorder } from "../sending/Engagement.js";
 import { tokenFromVerp } from "../sending/Tracking.js";
 import { CrmJobBase } from "./CrmJobBase.js";
@@ -33,6 +33,7 @@ export interface MessageDeliveredEvent {
     messageUid: string;
     envelopeTo: string[];
     fromAddress?: string;
+    subject?: string;
     messageId?: string;
     inReplyTo?: string;
     references: string[];
@@ -40,6 +41,16 @@ export interface MessageDeliveredEvent {
     precedence?: string;
     deliveryStatusReport?: { originalMessageId?: string; recipients: DeliveryStatusRecipient[] };
     feedbackReport?: { feedbackType: string; originalMessageId?: string };
+}
+
+/** restapi's `message.sent` event: a message sent from a mailbox. */
+export interface MessageSentEvent {
+    type: "message.sent";
+    occurredAt: string;
+    mailboxUid?: string;
+    messageUid?: string;
+    messageId: string;
+    recipients: string[];
 }
 
 /** The Redis commands the job uses. */
@@ -141,6 +152,8 @@ export abstract class CrmMailEventJob extends CrmJobBase {
         try {
             if (event?.type === "message.delivered") {
                 await this.handle(event as MessageDeliveredEvent);
+            } else if (event?.type === "message.sent") {
+                await this.handleSent(event as MessageSentEvent);
             }
         } catch (err: any) {
             this.logger?.warn(`CrmMailEventJob: handling mail event ${entry.id} failed: ${err?.message ?? err}`);
@@ -176,6 +189,61 @@ export abstract class CrmMailEventJob extends CrmJobBase {
         const send: OutboundSend | undefined = await this.findSend(event.mailboxUid, undefined, [event.inReplyTo, ...(event.references ?? [])]);
         if (send) {
             await this.recorder().record(send, EngagementType.REPLIED, { messageUid: event.messageUid }, at);
+        }
+        if (event.fromAddress) {
+            await this.logEmail(event.mailboxUid, [event.fromAddress], TimelineKind.EMAIL_RECEIVED, event.messageUid, (mailbox) =>
+                `Emailed ${mailbox}${event.subject ? `: ${event.subject}` : ""}`,
+            );
+        }
+    }
+
+    /** Logs a message a logging sender's mailbox sent to contacts (`WorkspaceSender.logEmail`) on their timelines. */
+    public async handleSent(event: MessageSentEvent): Promise<void> {
+        if (event.mailboxUid) {
+            await this.logEmail(event.mailboxUid, event.recipients, TimelineKind.EMAIL_SENT, event.messageUid ?? event.messageId, (mailbox) => `Emailed by ${mailbox}`);
+        }
+    }
+
+    /**
+     * Adds a timeline entry for each of `addresses` that is a contact of a workspace whose sender with mailbox `mailboxUid` logs email -
+     * once per message and contact (`refUid`), however often the event comes.
+     */
+    private async logEmail(mailboxUid: string, addresses: string[], kind: TimelineKind, messageRef: string, summary: (mailbox: string) => string): Promise<void> {
+        const senders: WorkspaceSender[] = await (await this.repo<WorkspaceSender>("workspaceSender")).find(
+            { mailboxUid: ModelUtils.literal(mailboxUid), logEmail: ModelUtils.literal(true) },
+            { ignoreACL: true, limit: 50, skipCache: true },
+        );
+        const emails: string[] = [...new Set(addresses.map((address) => address.toLowerCase()))].slice(0, 100);
+        if (senders.length === 0 || emails.length === 0) {
+            return;
+        }
+        const timeline: RepoUtils<TimelineEvent> = await this.repo<TimelineEvent>("timelineEvent");
+        for (const sender of senders) {
+            const contacts: CrmContact[] = await (await this.repo<CrmContact>("contact")).find(
+                { workspaceUid: ModelUtils.literal(sender.workspaceUid), email: ModelUtils.literal(emails, "in") },
+                { ignoreACL: true, limit: emails.length, skipCache: true },
+            );
+            for (const contact of contacts) {
+                const logged: TimelineEvent[] = await timeline.find(
+                    { subjectUid: ModelUtils.literal(contact.uid), kind: ModelUtils.literal(kind), refUid: ModelUtils.literal(messageRef) },
+                    { ignoreACL: true, limit: 1, skipCache: true },
+                );
+                if (logged.length === 0) {
+                    await timeline.create(
+                        new this.classes.timelineEvent({
+                            workspaceUid: sender.workspaceUid,
+                            subjectType: CrmObjectType.CONTACT,
+                            subjectUid: contact.uid,
+                            kind,
+                            summary: summary(sender.fromAddress).slice(0, 500),
+                            occurredAt: new Date(),
+                            data: { mailboxUid },
+                            refUid: messageRef,
+                        }),
+                        { ignoreACL: true, skipPush: true },
+                    );
+                }
+            }
         }
     }
 

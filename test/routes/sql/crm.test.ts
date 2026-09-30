@@ -17,6 +17,7 @@ import { SegmentRefreshJobSQL } from "../../../src/jobs/sql/SegmentRefreshJobSQL
 import { ScoringJobSQL } from "../../../src/jobs/sql/ScoringJobSQL.js";
 import { AutomationTriggerJobSQL } from "../../../src/jobs/sql/AutomationTriggerJobSQL.js";
 import { AutomationRunJobSQL } from "../../../src/jobs/sql/AutomationRunJobSQL.js";
+import { TaskReminderJobSQL } from "../../../src/jobs/sql/TaskReminderJobSQL.js";
 import { registerTestDoubles, type InMemoryBlobStore, type RecordingMailTransport } from "../../testDoubles.js";
 import { CrmTestContext, TestUser } from "../context.js";
 import { runCrmSuites } from "../suites.js";
@@ -97,7 +98,7 @@ describe("CRM routes (SQL)", () => {
         blobStore: () => objectFactory.getInstance<InMemoryBlobStore>("BlobStore") as InMemoryBlobStore,
         importJob: async () => await objectFactory.newInstance(CrmImportJobSQL, { name: `import-${uuid.v4()}` }),
         job: async (name) =>
-            await objectFactory.newInstance({ campaign: CampaignJobSQL, send: SendDispatchJobSQL, events: CrmMailEventJobSQL, segments: SegmentRefreshJobSQL, scoring: ScoringJobSQL, triggers: AutomationTriggerJobSQL, automations: AutomationRunJobSQL }[name], { name: `${name}-${uuid.v4()}` }),
+            await objectFactory.newInstance({ campaign: CampaignJobSQL, send: SendDispatchJobSQL, events: CrmMailEventJobSQL, segments: SegmentRefreshJobSQL, scoring: ScoringJobSQL, triggers: AutomationTriggerJobSQL, automations: AutomationRunJobSQL, reminders: TaskReminderJobSQL }[name], { name: `${name}-${uuid.v4()}` }),
         repo: async (name: string) => await repos.get(name as any),
         pushed: () => pushed,
         route: (name: string) => objectFactory.getInstance(`routes.${name}`),

@@ -15,11 +15,13 @@ import { CrmImportSQL } from "./CrmImportSQL.js";
 import { CrmNoteSQL } from "./CrmNoteSQL.js";
 import { CrmSettingSQL } from "./CrmSettingSQL.js";
 import { CrmTaskSQL } from "./CrmTaskSQL.js";
+import { DealSQL } from "./DealSQL.js";
 import { EmailTemplateSQL } from "./EmailTemplateSQL.js";
 import { EngagementEventSQL } from "./EngagementEventSQL.js";
 import { EnrollmentSQL } from "./EnrollmentSQL.js";
 import { MailingListSQL } from "./MailingListSQL.js";
 import { OutboundSendSQL } from "./OutboundSendSQL.js";
+import { PipelineSQL } from "./PipelineSQL.js";
 import { PropertyDefinitionSQL } from "./PropertyDefinitionSQL.js";
 import { PropertyValueSQL } from "./PropertyValueSQL.js";
 import { SavedBlockSQL } from "./SavedBlockSQL.js";
@@ -61,5 +63,7 @@ export const SQL_MODELS: CrmModelClasses = {
     automationVersion: AutomationVersionSQL,
     enrollment: EnrollmentSQL,
     crmEvent: CrmEventSQL,
+    pipeline: PipelineSQL,
+    deal: DealSQL,
     mailbox: MailboxSQL,
 };

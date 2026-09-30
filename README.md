@@ -70,7 +70,16 @@ This first release covers the CRM core:
   - **Running:** contacts go through the version they entered. A goal takes them out early, and a re-entry rule decides whether
     they can go through again. Each step shows live numbers, and every contact's run can be looked at or stopped.
 
-Sales pipelines follow in a later release.
+- **Sales pipelines and deals**:
+  - Pipelines are made of stages, each with a win probability, a kind (open, won or lost) and optional "rotting" days. A workspace
+    gets a default "Sales" pipeline.
+  - Deals carry an amount, an owner, the contacts and company involved and an expected close date. They move across a kanban board
+    by drag and drop or menu; moving one to a lost stage asks why.
+  - A forecast gives open value and weighted value per stage, win rate and time to win.
+  - Each deal keeps its stage history, notes, tasks and activity. Moves show on the deal's and its contacts' timelines, and deals
+    won, lost or moved can start automations.
+- **Task reminders** notify the assignee when a task comes due.
+- **1:1 email logging** (per sender, opt-in): mail the sender's mailbox exchanges with contacts goes on their timelines.
 
 ## Installing
 
@@ -102,6 +111,7 @@ Replies, bounces and complaints are learned from restapi's mail event stream, so
 | `mail:crm:jobs:segments:schedule`, `...:refresh_seconds`, `...:batch` | `0 * * * * *`, `300`, `20` | How dynamic segments are kept current. |
 | `mail:crm:jobs:scoring:schedule`, `...:interval_seconds`, `...:batch` | `30 * * * * *`, `3600`, `5` | How lead scores are kept current. |
 | `mail:crm:jobs:triggers:schedule`, `...:batch`, `...:retention_days` | `*/5 * * * * *`, `200`, `30` | How contact events are handed to automations, and how long they are kept. |
+| `mail:crm:jobs:reminders:schedule`, `...:lead_minutes` | `15 * * * * *`, `15` | How task reminders are sent, and how long before a task is due. |
 | `mail:crm:jobs:automations:schedule`, `...:batch`, `...:lease_seconds`, `...:paused_retry_seconds` | `*/5 * * * * *`, `100`, `120`, `60` | How contacts are moved through automations. |
 
 ## API
@@ -125,6 +135,8 @@ A deployment administrator has no access to a workspace they aren't a member of.
 | `segments` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/preview` (`{ filter }`), `POST /:workspaceUid/:uid/refresh` |
 | `scoring-rules` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` (admins), `POST /:workspaceUid/recalculate` |
 | `automations` | `GET /:workspaceUid`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `POST /:workspaceUid/:uid/publish\|pause\|resume`, `POST /:workspaceUid/:uid/enroll` (`{ contactUids }`), `GET /:workspaceUid/:uid/report`, `POST /:workspaceUid/:uid/enrollments`, `POST /:workspaceUid/:uid/enrollments/:enrollmentUid/exit` |
+| `pipelines` | `GET /:workspaceUid` (makes a default pipeline if there is none), `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid` (admins) |
+| `deals` | `GET /:workspaceUid?pipelineUid=&stageId=&status=&ownerUserUid=&companyUid=&contactUid=`, `GET/PUT/DELETE /:workspaceUid/:uid`, `POST /:workspaceUid`, `GET /:workspaceUid/forecast?pipelineUid=&days=` |
 | `public` (anonymous) | `GET/POST /forms/:formUid`, `POST /confirm/:token`, `GET/POST /preferences/:token`, `GET/POST /unsubscribe/:token` |
 | `t` (anonymous) | `GET /o/:token` (open image), `GET /c/:token/:index?u=&s=` (tracked link) |
 

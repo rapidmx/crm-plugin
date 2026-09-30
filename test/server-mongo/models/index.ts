@@ -29,3 +29,5 @@ export { AutomationMongo } from "../../../src/models/mongo/AutomationMongo.js";
 export { AutomationVersionMongo } from "../../../src/models/mongo/AutomationVersionMongo.js";
 export { EnrollmentMongo } from "../../../src/models/mongo/EnrollmentMongo.js";
 export { CrmEventMongo } from "../../../src/models/mongo/CrmEventMongo.js";
+export { PipelineMongo } from "../../../src/models/mongo/PipelineMongo.js";
+export { DealMongo } from "../../../src/models/mongo/DealMongo.js";

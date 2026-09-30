@@ -2,13 +2,14 @@
 // Copyright (C) 2026 Jean-Philippe Steinmetz. All rights reserved.
 // SPDX-License-Identifier: MPL-2.0
 ///////////////////////////////////////////////////////////////////////////////
-import { ModelUtils } from "@rapidrest/service-core";
+import { ModelUtils, RepoUtils } from "@rapidrest/service-core";
 import { CONTACT_EXPORT_FIELDS, CONTACT_FIELDS } from "../filters/fields.js";
-import { CrmCompany, CrmContact, CrmObjectType, EmailStatus, LifecycleStage } from "../models/types.js";
+import { CrmCompany, CrmContact, CrmObjectType, Deal, EmailStatus, LifecycleStage, PropertyValue } from "../models/types.js";
 import { badRequest, conflict, normalizeDomain, readEmail, readEnum, readNumber, readTags, readText } from "../util/Validation.js";
 import { IMPORT_FIELDS } from "../util/ImportMapping.js";
 import { BaseTaggedRecordRoute } from "./BaseTaggedRecordRoute.js";
 import { WriteContext } from "./BaseWorkspaceRecordRoute.js";
+import { DEAL_CONTACTS_KEY } from "./BaseDealRoute.js";
 
 /** How many contacts one workspace may have. */
 export const MAX_CONTACTS = 1000000;
@@ -143,12 +144,33 @@ export abstract class BaseContactRoute extends BaseTaggedRecordRoute<CrmContact>
     protected override async deleteRelated(uids: string[], workspaceUid: string): Promise<void> {
         await super.deleteRelated(uids, workspaceUid);
         if (uids.length > 0) {
+            await this.removeFromDeals(uids, workspaceUid);
             for (const name of ["subscription", "outboundSend", "engagementEvent", "enrollment", "crmEvent"] as const) {
                 await (await this.repo(name)).truncate(
                     { workspaceUid: ModelUtils.literal(workspaceUid), contactUid: ModelUtils.literal(uids, "in") },
                     { ignoreACL: true, skipPush: true },
                 );
             }
+        }
+    }
+
+    /** Takes deleted contacts off the deals they were on. */
+    private async removeFromDeals(uids: string[], workspaceUid: string): Promise<void> {
+        const values: RepoUtils<PropertyValue> = await this.repo<PropertyValue>("propertyValue");
+        const scope = { workspaceUid: ModelUtils.literal(workspaceUid), objectType: ModelUtils.literal(CrmObjectType.DEAL), key: ModelUtils.literal(DEAL_CONTACTS_KEY) };
+        const rows: PropertyValue[] = await values.find({ ...scope, stringValue: ModelUtils.literal(uids, "in") }, { ignoreACL: true, limit: 10_000, skipCache: true });
+        const deals: RepoUtils<Deal> = await this.repo<Deal>("deal");
+        for (const dealUid of new Set(rows.map((row) => row.objectUid))) {
+            const deal: Deal | undefined = await deals.findOne(dealUid, { ignoreACL: true, skipCache: true });
+            if (deal) {
+                await deals.update({ uid: deal.uid, version: deal.version, contactUids: deal.contactUids.filter((uid) => !uids.includes(uid)) }, deal, {
+                    ignoreACL: true,
+                    skipPush: true,
+                });
+            }
+        }
+        if (rows.length > 0) {
+            await values.truncate({ ...scope, stringValue: ModelUtils.literal(uids, "in") }, { ignoreACL: true });
         }
     }
 

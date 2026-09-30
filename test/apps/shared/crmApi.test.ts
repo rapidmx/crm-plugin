@@ -251,6 +251,36 @@ describe("crmApi", () => {
         ]);
     });
 
+    it("calls each pipeline, deal and sender endpoint", async () => {
+        const calls = recordCalls(() => jsonResponse(200, {}));
+        await api.listPipelines("w");
+        await api.createPipeline("w", { name: "P" });
+        await api.updatePipeline("w", "p", { isDefault: true });
+        await api.deletePipeline("w", "p");
+        await api.listDeals("w");
+        await api.listDeals("w", { pipelineUid: "p", status: "open", ownerUserUid: undefined });
+        await api.getDeal("w", "d");
+        await api.createDeal("w", { name: "D" });
+        await api.updateDeal("w", "d", { stageId: "s" });
+        await api.deleteDeal("w", "d");
+        await api.dealForecast("w", "p");
+        await api.updateSender("w", "s", { logEmail: true });
+        expect(calls).toEqual([
+            "GET /api/mail/crm/pipelines/w?limit=50",
+            'POST /api/mail/crm/pipelines/w {"name":"P"}',
+            'PUT /api/mail/crm/pipelines/w/p {"isDefault":true}',
+            "DELETE /api/mail/crm/pipelines/w/p",
+            "GET /api/mail/crm/deals/w?limit=200",
+            "GET /api/mail/crm/deals/w?limit=200&pipelineUid=p&status=open",
+            "GET /api/mail/crm/deals/w/d",
+            'POST /api/mail/crm/deals/w {"name":"D"}',
+            'PUT /api/mail/crm/deals/w/d {"stageId":"s"}',
+            "DELETE /api/mail/crm/deals/w/d",
+            "GET /api/mail/crm/deals/w/forecast?pipelineUid=p&days=90",
+            'PUT /api/mail/crm/workspaces/w/senders/s {"logEmail":true}',
+        ]);
+    });
+
     it("uploads a CSV file as the raw body and reads the answer", async () => {
         const fetchMock = mockFetch(() => jsonResponse(200, { import: { uid: "i" }, targets: [], preview: [] }));
         const file = new File(["email\na@x.example"], "people list.csv", { type: "text/csv" });

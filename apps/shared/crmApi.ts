@@ -10,6 +10,8 @@ import { ApiRequestError, apiFetch, apiUrl, withCsrfHeader } from "@rapidmx/web-
 
 export type WorkspaceRole = "owner" | "admin" | "editor" | "viewer";
 export type CrmObjectType = "contact" | "company";
+/** What notes, tasks and timelines can be about. */
+export type SubjectType = CrmObjectType | "deal";
 
 interface Stored {
     uid: string;
@@ -43,6 +45,8 @@ export interface WorkspaceSender extends Stored {
     fromAddress: string;
     fromName: string;
     replyToAddress?: string;
+    /** Mail its mailbox exchanges with contacts goes on their timelines. */
+    logEmail?: boolean;
 }
 
 export type PropertyViewValue = string | number | boolean | string[];
@@ -97,7 +101,7 @@ export interface PropertyDefinition extends Stored {
 }
 
 export interface Note extends Stored {
-    subjectType: CrmObjectType;
+    subjectType: SubjectType;
     subjectUid: string;
     body: string;
     authorUserUid: string;
@@ -114,7 +118,7 @@ export interface Task extends Stored {
     priority: TaskPriority;
     dueAt?: string;
     assigneeUserUid?: string;
-    subjectType?: CrmObjectType;
+    subjectType?: SubjectType;
     subjectUid?: string;
     completedAt?: string;
 }
@@ -201,7 +205,9 @@ export const updateMember = (uid: string, userUid: string, role: WorkspaceRole):
     apiFetch(`/mail/crm/workspaces/${enc(uid)}/members/${enc(userUid)}`, json("PUT", { role }));
 export const removeMember = (uid: string, userUid: string): Promise<void> => apiFetch(`/mail/crm/workspaces/${enc(uid)}/members/${enc(userUid)}`, json("DELETE"));
 export const listSenders = (uid: string): Promise<WorkspaceSender[]> => apiFetch(`/mail/crm/workspaces/${enc(uid)}/senders`);
-export const addSender = (uid: string, input: { fromAddress: string; fromName?: string; replyToAddress?: string }): Promise<WorkspaceSender> =>
+export const updateSender = (uid: string, senderUid: string, input: { fromName?: string; replyToAddress?: string | null; logEmail?: boolean }): Promise<WorkspaceSender> =>
+    apiFetch(`/mail/crm/workspaces/${enc(uid)}/senders/${enc(senderUid)}`, json("PUT", input));
+export const addSender = (uid: string, input: { fromAddress: string; fromName?: string; replyToAddress?: string; logEmail?: boolean }): Promise<WorkspaceSender> =>
     apiFetch(`/mail/crm/workspaces/${enc(uid)}/senders`, json("POST", input));
 export const removeSender = (uid: string, senderUid: string): Promise<void> => apiFetch(`/mail/crm/workspaces/${enc(uid)}/senders/${enc(senderUid)}`, json("DELETE"));
 
@@ -258,7 +264,7 @@ export const deleteProperty = (workspaceUid: string, uid: string): Promise<void>
 
 export const listNotes = (workspaceUid: string, subjectUid: string): Promise<Note[]> =>
     apiFetch(`/mail/crm/notes/${enc(workspaceUid)}?limit=200&subjectUid=${enc(subjectUid)}`);
-export const createNote = (workspaceUid: string, input: { subjectType: CrmObjectType; subjectUid: string; body: string }): Promise<Note> =>
+export const createNote = (workspaceUid: string, input: { subjectType: SubjectType; subjectUid: string; body: string }): Promise<Note> =>
     apiFetch(`/mail/crm/notes/${enc(workspaceUid)}`, json("POST", input));
 export const deleteNote = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/notes/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
 
@@ -274,7 +280,7 @@ export const updateTask = (workspaceUid: string, uid: string, input: Partial<Tas
     apiFetch(`/mail/crm/tasks/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
 export const deleteTask = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/tasks/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
 
-export const listTimeline = (workspaceUid: string, subjectType: CrmObjectType, subjectUid: string): Promise<TimelineEvent[]> =>
+export const listTimeline = (workspaceUid: string, subjectType: SubjectType, subjectUid: string): Promise<TimelineEvent[]> =>
     apiFetch(`/mail/crm/timeline/${enc(workspaceUid)}/${subjectType}/${enc(subjectUid)}?limit=100`);
 
 // Lists, subscriptions, suppressions, forms
@@ -816,3 +822,78 @@ export const listEnrollments = (
 ): Promise<SearchResult<Enrollment>> => apiFetch(automationPath(workspaceUid, `/${enc(uid)}/enrollments`), json("POST", query));
 export const exitEnrollment = (workspaceUid: string, uid: string, enrollmentUid: string): Promise<Enrollment> =>
     apiFetch(automationPath(workspaceUid, `/${enc(uid)}/enrollments/${enc(enrollmentUid)}/exit`), json("POST", {}));
+
+// Pipelines and deals
+
+export type StageKind = "open" | "won" | "lost";
+export type DealStatus = "open" | "won" | "lost";
+
+export interface PipelineStage {
+    id: string;
+    name: string;
+    probability: number;
+    kind: StageKind;
+    rottingDays?: number | null;
+}
+
+export interface Pipeline extends Stored {
+    workspaceUid: string;
+    name: string;
+    stages: PipelineStage[];
+    isDefault: boolean;
+}
+
+export interface Deal extends Stored {
+    workspaceUid: string;
+    name: string;
+    amount: number;
+    currency: string;
+    pipelineUid: string;
+    stageId: string;
+    status: DealStatus;
+    ownerUserUid?: string | null;
+    contactUids: string[];
+    companyUid?: string | null;
+    expectedCloseDate?: string | null;
+    closedAt?: string | null;
+    lostReason?: string | null;
+    stageChangedAt: string;
+    stageHistory: { stageId: string; at: string; userUid?: string }[];
+}
+
+export interface Forecast {
+    stages: { stageId: string; count: number; amount: number; weighted: number }[];
+    open: { count: number; amount: number; weighted: number };
+    won: { count: number; amount: number };
+    lost: { count: number; amount: number };
+    winRate?: number;
+    averageDaysToWin?: number;
+}
+
+export type PipelineInput = Partial<Pick<Pipeline, "name" | "isDefault">> & { stages?: Partial<PipelineStage>[] };
+export type DealInput = Partial<
+    Pick<Deal, "name" | "amount" | "currency" | "pipelineUid" | "stageId" | "ownerUserUid" | "contactUids" | "companyUid" | "expectedCloseDate" | "lostReason" | "version">
+>;
+
+export const listPipelines = (workspaceUid: string): Promise<Pipeline[]> => apiFetch(`/mail/crm/pipelines/${enc(workspaceUid)}?limit=50`);
+export const createPipeline = (workspaceUid: string, input: PipelineInput): Promise<Pipeline> => apiFetch(`/mail/crm/pipelines/${enc(workspaceUid)}`, json("POST", input));
+export const updatePipeline = (workspaceUid: string, uid: string, input: PipelineInput): Promise<Pipeline> =>
+    apiFetch(`/mail/crm/pipelines/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deletePipeline = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/pipelines/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+
+/** A pipeline's deals, or a contact's (`contactUid`). */
+export function listDeals(workspaceUid: string, query: { pipelineUid?: string; status?: DealStatus; ownerUserUid?: string; contactUid?: string } = {}): Promise<Deal[]> {
+    const params = new URLSearchParams({ limit: "200" });
+    for (const [key, value] of Object.entries(query)) {
+        if (value) {
+            params.set(key, value);
+        }
+    }
+    return apiFetch(`/mail/crm/deals/${enc(workspaceUid)}?${params.toString()}`);
+}
+export const getDeal = (workspaceUid: string, uid: string): Promise<Deal> => apiFetch(`/mail/crm/deals/${enc(workspaceUid)}/${enc(uid)}`);
+export const createDeal = (workspaceUid: string, input: DealInput): Promise<Deal> => apiFetch(`/mail/crm/deals/${enc(workspaceUid)}`, json("POST", input));
+export const updateDeal = (workspaceUid: string, uid: string, input: DealInput): Promise<Deal> => apiFetch(`/mail/crm/deals/${enc(workspaceUid)}/${enc(uid)}`, json("PUT", input));
+export const deleteDeal = (workspaceUid: string, uid: string): Promise<void> => apiFetch(`/mail/crm/deals/${enc(workspaceUid)}/${enc(uid)}`, json("DELETE"));
+export const dealForecast = (workspaceUid: string, pipelineUid: string, days: number = 90): Promise<Forecast> =>
+    apiFetch(`/mail/crm/deals/${enc(workspaceUid)}/forecast?pipelineUid=${enc(pipelineUid)}&days=${days}`);

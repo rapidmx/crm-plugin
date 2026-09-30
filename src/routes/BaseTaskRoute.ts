@@ -51,6 +51,10 @@ export abstract class BaseTaskRoute extends BaseWorkspaceRecordRoute<CrmTask> {
         if (fields.status && fields.status !== existing.status) {
             (fields as any).completedAt = fields.status === TaskStatus.DONE ? new Date() : null;
         }
+        // A new due date, or a new assignee, gets its own reminder.
+        if (("dueAt" in fields && String(fields.dueAt) !== String(existing.dueAt)) || ("assigneeUserUid" in fields && fields.assigneeUserUid !== existing.assigneeUserUid)) {
+            (fields as any).remindedAt = null;
+        }
         return fields;
     }
 

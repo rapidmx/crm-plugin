@@ -22,6 +22,7 @@ const { Nullable } = ObjectDecorators;
 @Index("crm_task_workspace_status_due", ["workspaceUid", "status", "dueAt"])
 @Index("crm_task_workspace_assignee", ["workspaceUid", "assigneeUserUid"])
 @Index("crm_task_subject", ["workspaceUid", "subjectUid"])
+@Index("crm_task_due", ["status", "dueAt"])
 @Protect(
     {
         uid: "CrmTask",
@@ -83,6 +84,11 @@ export class CrmTaskMongo extends BaseMongoEntity implements CrmTask {
     @Description("Who created the task.")
     public createdByUserUid: string = "";
 
+    @Column({ nullable: true })
+    @Description("When the assignee was reminded.")
+    @Nullable
+    public remindedAt?: Date;
+
     constructor(other?: Partial<CrmTaskMongo>) {
         super(other);
 
@@ -98,6 +104,7 @@ export class CrmTaskMongo extends BaseMongoEntity implements CrmTask {
             this.subjectUid = "subjectUid" in other ? other.subjectUid : this.subjectUid;
             this.completedAt = "completedAt" in other ? other.completedAt : this.completedAt;
             this.createdByUserUid = other.createdByUserUid !== undefined ? other.createdByUserUid : this.createdByUserUid;
+            this.remindedAt = "remindedAt" in other ? other.remindedAt : this.remindedAt;
         }
     }
 }

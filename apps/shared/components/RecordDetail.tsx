@@ -32,10 +32,12 @@ import {
     Subscription,
     updateRecord,
     updateTask,
+    SubjectType,
 } from "../crmApi.js";
 import { FieldInfo, fieldValue, recordFields } from "../fields.js";
 import { INPUT_CLASS, useCrm } from "./CrmShell.js";
 import { recordName } from "./RecordList.js";
+import ContactDeals from "./deals/ContactDeals.js";
 
 /** The fields the record page edits besides custom properties (tags and dates are shown, not edited here). */
 const EDITABLE: Record<CrmObjectType, string[]> = {
@@ -218,19 +220,10 @@ export default function RecordDetail({ objectType, uid }: { objectType: CrmObjec
             </form>
             <div className="flex flex-col gap-6">
                 {objectType === "contact" && <Subscriptions uid={uid} emailStatus={(record as any).emailStatus} onChange={loadActivity} />}
+                {objectType === "contact" && <ContactDeals contactUid={uid} />}
                 <Notes objectType={objectType} uid={uid} notes={notes} onChange={loadActivity} />
                 <Tasks objectType={objectType} uid={uid} tasks={tasks} onChange={loadActivity} />
-                <section aria-label="Activity">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted mb-2">Activity</h2>
-                    <ol className="flex flex-col gap-2">
-                        {timeline.map((entry) => (
-                            <li key={entry.uid} className="text-sm border-l-2 border-border pl-3">
-                                <div>{entry.summary}</div>
-                                <div className="text-xs text-text-muted">{new Date(entry.occurredAt).toLocaleString()}</div>
-                            </li>
-                        ))}
-                    </ol>
-                </section>
+                <Activity timeline={timeline} />
             </div>
         </div>
     );
@@ -323,7 +316,25 @@ function Subscriptions({ uid, emailStatus, onChange }: { uid: string; emailStatu
 }
 
 /** The record's notes, and a box for a new one. */
-function Notes({ objectType, uid, notes, onChange }: { objectType: CrmObjectType; uid: string; notes: Note[]; onChange: () => Promise<void> }) {
+/** A record's activity timeline, newest first. */
+export function Activity({ timeline }: { timeline: TimelineEvent[] }) {
+    return (
+        <section aria-label="Activity">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted mb-2">Activity</h2>
+            <ol className="flex flex-col gap-2">
+                {timeline.map((entry) => (
+                    <li key={entry.uid} className="text-sm border-l-2 border-border pl-3">
+                        <div>{entry.summary}</div>
+                        <div className="text-xs text-text-muted">{new Date(entry.occurredAt).toLocaleString()}</div>
+                    </li>
+                ))}
+            </ol>
+        </section>
+    );
+}
+
+/** A record's notes, and adding and deleting them. */
+export function Notes({ objectType, uid, notes, onChange }: { objectType: SubjectType; uid: string; notes: Note[]; onChange: () => Promise<void> }) {
     const { workspace, canWrite } = useCrm();
     const [body, setBody] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -377,7 +388,8 @@ function Notes({ objectType, uid, notes, onChange }: { objectType: CrmObjectType
 }
 
 /** The record's tasks: tick one off, or add one. */
-function Tasks({ objectType, uid, tasks, onChange }: { objectType: CrmObjectType; uid: string; tasks: Task[]; onChange: () => Promise<void> }) {
+/** A record's tasks, and adding and completing them. */
+export function Tasks({ objectType, uid, tasks, onChange }: { objectType: SubjectType; uid: string; tasks: Task[]; onChange: () => Promise<void> }) {
     const { workspace, canWrite } = useCrm();
     const [title, setTitle] = useState("");
     const [dueAt, setDueAt] = useState("");

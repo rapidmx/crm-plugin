@@ -10,6 +10,7 @@ import {
     CrmForm,
     EmailTemplate,
     MailingList,
+    Pipeline,
     Segment,
     WorkspaceMember,
     WorkspaceSender,
@@ -17,6 +18,7 @@ import {
     listForms,
     listLists,
     listMembers,
+    listPipelines,
     listSegments,
     listSenders,
     searchTemplates,
@@ -36,9 +38,10 @@ export interface AutomationData {
     senders: WorkspaceSender[];
     members: WorkspaceMember[];
     automations: Automation[];
+    pipelines: Pipeline[];
 }
 
-const EMPTY: AutomationData = { lists: [], forms: [], segments: [], templates: [], senders: [], members: [], automations: [] };
+const EMPTY: AutomationData = { lists: [], forms: [], segments: [], templates: [], senders: [], members: [], automations: [], pipelines: [] };
 
 /** Loads what the step settings pick from. Anything that fails to load is left empty. */
 export function useAutomationData(): AutomationData {
@@ -57,7 +60,10 @@ export function useAutomationData(): AutomationData {
             settle(listSenders(workspace.uid), []),
             settle(listMembers(workspace.uid), []),
             settle(listAutomations(workspace.uid), []),
-        ]).then(([lists, forms, segments, templates, senders, members, automations]) => setData({ lists, forms, segments, templates, senders, members, automations }));
+            settle(listPipelines(workspace.uid), []),
+        ]).then(([lists, forms, segments, templates, senders, members, automations, pipelines]) =>
+            setData({ lists, forms, segments, templates, senders, members, automations, pipelines }),
+        );
     }, [workspace.uid]);
     return data;
 }
@@ -76,6 +82,10 @@ export const TRIGGER_EVENTS: { value: string; label: string }[] = [
     { value: "email.replied", label: "Replies to an email" },
     { value: "email.bounced", label: "Has an email bounce" },
     { value: "email.unsubscribed", label: "Unsubscribes through an email" },
+    { value: "deal.created", label: "Gets a new deal" },
+    { value: "deal.stage_changed", label: "Has a deal move to another stage" },
+    { value: "deal.won", label: "Has a deal won" },
+    { value: "deal.lost", label: "Has a deal lost" },
     { value: "manual", label: "Is put in by hand (or by another automation)" },
 ];
 
@@ -178,13 +188,27 @@ export default function StepInspector({
         case "trigger":
             fields = (
                 <>
-                    <Select label="When a contact" value={config.event} options={TRIGGER_EVENTS} onChange={(event) => onChange({ event, listUid: undefined, formUid: undefined, segmentUid: undefined, fields: undefined })} />
+                    <Select label="When a contact" value={config.event} options={TRIGGER_EVENTS} onChange={(event) => onChange({ event, listUid: undefined, formUid: undefined, segmentUid: undefined, pipelineUid: undefined, stageId: undefined, fields: undefined })} />
                     {(config.event === "list.subscribed" || config.event === "list.unsubscribed") && (
                         <Select label="List" value={config.listUid} options={names(data.lists)} empty="Any list" onChange={set("listUid")} />
                     )}
                     {config.event === "form.submitted" && <Select label="Form" value={config.formUid} options={names(data.forms)} empty="Any form" onChange={set("formUid")} />}
                     {(config.event === "segment.entered" || config.event === "segment.left") && (
                         <Select label="Segment" value={config.segmentUid} options={names(data.segments)} empty="Any segment" onChange={set("segmentUid")} />
+                    )}
+                    {String(config.event).startsWith("deal.") && (
+                        <>
+                            <Select label="Pipeline" value={config.pipelineUid} options={names(data.pipelines)} empty="Any pipeline" onChange={(pipelineUid) => onChange({ pipelineUid: pipelineUid || undefined, stageId: undefined })} />
+                            {config.event === "deal.stage_changed" && config.pipelineUid && (
+                                <Select
+                                    label="Moved to"
+                                    value={config.stageId}
+                                    options={(data.pipelines.find((pipeline) => pipeline.uid === config.pipelineUid)?.stages ?? []).map((stage) => ({ value: stage.id, label: stage.name }))}
+                                    empty="Any stage"
+                                    onChange={set("stageId")}
+                                />
+                            )}
+                        </>
                     )}
                     {config.event === "contact.updated" && (
                         <Text

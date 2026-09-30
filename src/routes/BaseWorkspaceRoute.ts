@@ -8,7 +8,7 @@ import { hasMailAccess, type Mailbox } from "@rapidmx/restapi";
 import { CrmModelName } from "../models/CrmModelClasses.js";
 import { Workspace, WorkspaceAction, WorkspaceMember, WorkspaceRole, WorkspaceSender } from "../models/types.js";
 import { isWorkspaceRole, memberRecord, notFound } from "../util/WorkspaceAccess.js";
-import { MAX_LONG_TEXT, badRequest, conflict, readEmail, readText, requireObject } from "../util/Validation.js";
+import { MAX_LONG_TEXT, badRequest, conflict, readBoolean, readEmail, readText, requireObject } from "../util/Validation.js";
 import { CrmRouteBase } from "./CrmRouteBase.js";
 const { Config } = ObjectDecorators;
 const { Delete, Get, Param, Post, Put, User: AuthUser } = RouteDecorators;
@@ -25,6 +25,8 @@ export const MAX_SENDERS = 50;
 
 /** Every model whose rows belong to a workspace (by `workspaceUid`), deleted with it. */
 const WORKSPACE_DATA: readonly CrmModelName[] = [
+    "deal",
+    "pipeline",
     "crmEvent",
     "enrollment",
     "automationVersion",
@@ -282,6 +284,7 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
                 fromAddress,
                 fromName: readText(request, "fromName") ?? mailbox.displayName,
                 replyToAddress: readEmail(request, "replyToAddress") ?? undefined,
+                logEmail: readBoolean(request, "logEmail") ?? false,
                 createdByUserUid: user!.uid.toLowerCase(),
             }),
             { ignoreACL: true, skipPush: true },
@@ -302,12 +305,14 @@ export abstract class BaseWorkspaceRoute extends CrmRouteBase {
         const request: Record<string, unknown> = requireObject(body);
         const fromName: string | null | undefined = readText(request, "fromName");
         const replyToAddress: string | null | undefined = readEmail(request, "replyToAddress");
+        const logEmail: boolean | undefined = readBoolean(request, "logEmail");
         const updated: WorkspaceSender = await (await this.repo<WorkspaceSender>("workspaceSender")).update(
             {
                 uid: sender.uid,
                 version: sender.version,
                 ...(fromName !== undefined ? { fromName: fromName ?? "" } : {}),
                 ...(replyToAddress !== undefined ? { replyToAddress } : {}),
+                ...(logEmail !== undefined ? { logEmail } : {}),
             } as any,
             sender,
             { ignoreACL: true, skipPush: true },

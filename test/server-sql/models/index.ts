@@ -29,3 +29,5 @@ export { AutomationSQL } from "../../../src/models/sql/AutomationSQL.js";
 export { AutomationVersionSQL } from "../../../src/models/sql/AutomationVersionSQL.js";
 export { EnrollmentSQL } from "../../../src/models/sql/EnrollmentSQL.js";
 export { CrmEventSQL } from "../../../src/models/sql/CrmEventSQL.js";
+export { PipelineSQL } from "../../../src/models/sql/PipelineSQL.js";
+export { DealSQL } from "../../../src/models/sql/DealSQL.js";

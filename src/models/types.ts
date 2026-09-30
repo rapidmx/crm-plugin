@@ -74,6 +74,8 @@ export interface WorkspaceMember extends CrmEntity {
  * removes it.
  */
 export interface WorkspaceSender extends CrmEntity {
+    /** Mail this sender's mailbox exchanges with the workspace's contacts goes on their timelines. */
+    logEmail: boolean;
     workspaceUid: string;
     mailboxUid: string;
     /** The `From` address - the mailbox's primary address or one of its aliases. */
@@ -234,6 +236,8 @@ export interface CrmTask extends CrmEntity {
     subjectUid?: string;
     completedAt?: Date;
     createdByUserUid: string;
+    /** When the assignee was reminded the task is due. */
+    remindedAt?: Date;
 }
 
 /** What a timeline entry records. Later phases add email and deal kinds. */
@@ -256,6 +260,10 @@ export enum TimelineKind {
     EMAIL_COMPLAINED = "email_complained",
     AUTOMATION_ENTERED = "automation_entered",
     AUTOMATION_FINISHED = "automation_finished",
+    DEAL_CREATED = "deal_created",
+    DEAL_STAGE_CHANGED = "deal_stage_changed",
+    DEAL_WON = "deal_won",
+    DEAL_LOST = "deal_lost",
 }
 
 /** One entry of a contact's, company's or deal's activity timeline. Append-only. */
@@ -833,4 +841,70 @@ export interface CrmEvent extends CrmEntity {
     occurredAt: Date;
     data: Record<string, unknown>;
     dispatchedAt?: Date;
+}
+
+/** Whether a stage is still being worked, or the end of a deal. */
+export enum StageKind {
+    OPEN = "open",
+    WON = "won",
+    LOST = "lost",
+}
+
+/** One stage of a pipeline. */
+export interface PipelineStage {
+    /** Stable across renames and reorders. */
+    id: string;
+    name: string;
+    /** The chance, in percent, that a deal in this stage is won - what the weighted forecast counts. */
+    probability: number;
+    kind: StageKind;
+    /** A deal in the stage longer than this many days is "rotting". None: never. */
+    rottingDays?: number;
+}
+
+/** The stages deals go through, in order. */
+export interface Pipeline extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    stages: PipelineStage[];
+    /** Where new pipelines-less deals go. */
+    isDefault: boolean;
+}
+
+/** Where a deal is. */
+export enum DealStatus {
+    OPEN = "open",
+    WON = "won",
+    LOST = "lost",
+}
+
+/** One move of a deal between stages. */
+export interface DealStageChange {
+    stageId: string;
+    at: Date;
+    userUid?: string;
+}
+
+/** A potential sale, going through a pipeline's stages. */
+export interface Deal extends CrmEntity {
+    workspaceUid: string;
+    name: string;
+    amount: number;
+    /** An ISO 4217 code: `USD`, `EUR`... */
+    currency: string;
+    pipelineUid: string;
+    stageId: string;
+    /** Follows the stage's kind. */
+    status: DealStatus;
+    ownerUserUid?: string;
+    /** The people involved. Mirrored into `PropertyValue` rows (object `deal`, key `contacts`) so a contact's deals can be found. */
+    contactUids: string[];
+    companyUid?: string;
+    expectedCloseDate?: Date;
+    closedAt?: Date;
+    lostReason?: string;
+    /** When it entered its stage. */
+    stageChangedAt: Date;
+    stageHistory: DealStageChange[];
+    createdByUserUid: string;
 }

@@ -137,6 +137,7 @@ export interface GraphReferences {
     segments: Set<string>;
     automations: Set<string>;
     members: Set<string>;
+    pipelines: Set<string>;
     /** Contact filters (triggers, conditions), to validate against the workspace's fields. */
     filters: unknown[];
 }
@@ -195,7 +196,7 @@ export function validateForPublish(graph: AutomationGraph): GraphReferences {
     }
     checkLoops(graph);
 
-    const references: GraphReferences = { templates: new Set(), senders: new Set(), lists: new Set(), forms: new Set(), segments: new Set(), automations: new Set(), members: new Set(), filters: [] };
+    const references: GraphReferences = { templates: new Set(), senders: new Set(), lists: new Set(), forms: new Set(), segments: new Set(), automations: new Set(), members: new Set(), pipelines: new Set(), filters: [] };
     for (const node of graph.nodes) {
         const where: string = `Step ${node.id}`;
         const config: Record<string, unknown> = node.config;
@@ -208,6 +209,7 @@ export function validateForPublish(graph: AutomationGraph): GraphReferences {
                     ["listUid", references.lists],
                     ["formUid", references.forms],
                     ["segmentUid", references.segments],
+                    ["pipelineUid", references.pipelines],
                 ] as const) {
                     if (config[field] !== undefined && config[field] !== null && config[field] !== "") {
                         set.add(text(config, field, where, 64));

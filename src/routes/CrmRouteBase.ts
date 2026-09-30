@@ -182,14 +182,14 @@ export abstract class CrmRouteBase {
 
     /** Refuses (400) a `subjectType`/`subjectUid` pair that isn't a contact or company of `workspaceUid`. */
     protected async requireSubject(workspaceUid: string, subjectType: unknown, subjectUid: unknown): Promise<{ subjectType: CrmObjectType; subjectUid: string }> {
-        const model: CrmModelName | undefined =
-            subjectType === CrmObjectType.CONTACT ? "contact" : subjectType === CrmObjectType.COMPANY ? "company" : undefined;
+        const models: Partial<Record<string, CrmModelName>> = { [CrmObjectType.CONTACT]: "contact", [CrmObjectType.COMPANY]: "company", [CrmObjectType.DEAL]: "deal" };
+        const model: CrmModelName | undefined = typeof subjectType === "string" ? models[subjectType] : undefined;
         const record: { workspaceUid: string } | undefined =
             model && typeof subjectUid === "string" && subjectUid.length > 0 && subjectUid.length <= 64
                 ? await (await this.repo(model)).findOne(subjectUid, { ignoreACL: true })
                 : undefined;
         if (!record || record.workspaceUid !== workspaceUid) {
-            throw badRequest("'subjectType' and 'subjectUid' must name a contact or company of the workspace.");
+            throw badRequest("'subjectType' and 'subjectUid' must name a contact, company or deal of the workspace.");
         }
         return { subjectType: subjectType as CrmObjectType, subjectUid: subjectUid as string };
     }

@@ -38,7 +38,7 @@ const MODELS: [string, string, string, string[], boolean][] = [
     ["PropertyDefinition", "property_definition", "CrmPropertyDefinition", ["crm_propdef_workspace_type_key"], false],
     ["PropertyValue", "property_value", "CrmPropertyValue", ["crm_propval_object_key", "crm_propval_string", "crm_propval_number", "crm_propval_date"], false],
     ["CrmNote", "crm_note", "CrmNote", ["crm_note_subject"], false],
-    ["CrmTask", "crm_task", "CrmTask", ["crm_task_workspace_status_due", "crm_task_workspace_assignee", "crm_task_subject"], false],
+    ["CrmTask", "crm_task", "CrmTask", ["crm_task_workspace_status_due", "crm_task_workspace_assignee", "crm_task_subject", "crm_task_due"], false],
     ["TimelineEvent", "timeline_event", "CrmTimelineEvent", ["crm_timeline_subject"], false],
     ["CrmImport", "crm_import", "CrmImport", ["crm_import_workspace", "crm_import_status"], false],
     ["MailingList", "mailing_list", "CrmMailingList", ["crm_list_workspace_name"], false],
@@ -63,6 +63,8 @@ const MODELS: [string, string, string, string[], boolean][] = [
     ["AutomationVersion", "automation_version", "CrmAutomationVersion", ["crm_automationversion_automation", "crm_automationversion_workspace"], false],
     ["Enrollment", "enrollment", "CrmEnrollment", ["crm_enrollment_due", "crm_enrollment_automation", "crm_enrollment_contact", "crm_enrollment_workspace"], false],
     ["CrmEvent", "crm_event", "CrmEvent", ["crm_event_dispatch", "crm_event_workspace", "crm_event_contact"], false],
+    ["Pipeline", "pipeline", "CrmPipeline", ["crm_pipeline_workspace"], false],
+    ["Deal", "deal", "CrmDeal", ["crm_deal_pipeline", "crm_deal_workspace", "crm_deal_company"], false],
 ];
 
 const ROUTES: [string, string][] = [
@@ -86,6 +88,8 @@ const ROUTES: [string, string][] = [
     ["Segment", "segments"],
     ["ScoringRule", "scoring-rules"],
     ["Automation", "automations"],
+    ["Pipeline", "pipelines"],
+    ["Deal", "deals"],
 ];
 
 describe("plugin entry points", () => {
@@ -102,6 +106,7 @@ describe("plugin entry points", () => {
             [`ScoringJob${suffix}`]: "job",
             [`AutomationTriggerJob${suffix}`]: "job",
             [`AutomationRunJob${suffix}`]: "job",
+            [`TaskReminderJob${suffix}`]: "job",
         };
         for (const [model] of MODELS) {
             expected[`${model}${suffix}`] = `model ${datastore}${model === "WorkspaceSender" ? " mailbox-scoped" : ""}`;

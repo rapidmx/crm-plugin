@@ -206,6 +206,22 @@ Keep entries terse — this is a reference, not a transcript.
   - **Editor.** The UI is a vertical branching flow (`apps/shared/components/automations/`), **not** `@xyflow/react` as planned:
     no new dependency or stylesheet for the server's page build. Joins and loops show as "Go to step" jumps. `flowModel.ts` holds
     the pure edits (insert, remove, connect, prune, layout) and the recipes.
+- **Deals** (Phase 7):
+  - **Stages.** `Pipeline.stages` is a JSON array; a stage's `id` is stable across renames and reorders. A stage that still holds
+    deals can't be removed, a pipeline with deals can't be deleted, and the default pipeline can't be deleted either.
+  - **Default pipeline.** `GET /pipelines/:ws` creates one if the workspace has none. This, and `GET /deals/:ws?contactUid=`, are
+    done by overriding the decorated `list()`; the decorators still apply to the override.
+  - **Stage moves.** `Deal.status` follows its stage's kind. A move appends to `stageHistory`, sets `closedAt` (and clears it on
+    reopening), and records timeline entries on the deal and each contact, plus `deal.*` events per contact for automations. A
+    trigger can filter by `pipelineUid` and `stageId`.
+  - **Contacts on a deal** are mirrored into `PropertyValue` rows (object `deal`, key `contacts`) so a contact's deals can be
+    queried on SQL. Deleting a contact takes it off its deals.
+  - **Other subjects.** Notes, tasks and timelines accept deals (`requireSubject`); deleting a deal deletes its notes and timeline
+    and unlinks its tasks.
+- **Task reminders.** `TaskReminderJob` pushes `CrmTaskDue` once per task, stamping `remindedAt`. A new due date or assignee resets
+  it. Tasks always get an assignee on create (the creator by default).
+- **1:1 email logging.** `WorkspaceSender.logEmail`, off by default. `CrmMailEventJob` logs `message.delivered` from a contact and
+  `message.sent` to contacts as `email_received` or `email_sent` timeline entries, once per message and contact (`refUid`).
 
 ## Session Log
 
@@ -277,3 +293,13 @@ Keep entries terse — this is a reference, not a transcript.
 - **New UI pages:** `/crm/automations` (list, with recipes) and `/crm/automations/<uid>` (flow editor, settings, contacts in it).
 - **Bug caught by tests:** creating an automation ignored `goalFilter`.
 - **Not done:** date-property triggers (birthdays, renewals). The webhook step comes with Phase 8's webhooks.
+
+### 2026-09-30 — Phase 7: pipelines, deals, reminders, email logging
+
+- **New models:** `Pipeline` and `Deal`.
+- **New fields:** `WorkspaceSender.logEmail` and `CrmTask.remindedAt`.
+- **New routes:** `pipelines` and `deals`.
+- **New job:** `TaskReminderJob`.
+- **New UI pages:** `/crm/deals` (kanban board), `/crm/deals/<uid>` and `/crm/pipelines`. The contact page gains a Deals section
+  and the settings a per-sender logging toggle.
+- **Not done:** the booking-plugin integration (meetings on the timeline). It needs booking to publish an event.

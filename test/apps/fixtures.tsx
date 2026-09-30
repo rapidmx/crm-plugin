@@ -89,6 +89,9 @@ export function stubBasics(api: any, overrides: { workspaces?: any[] } = {}): vo
     api.previewSegment.mockResolvedValue({ count: 0, capped: false, contacts: [] });
     api.listAutomations.mockResolvedValue([]);
     api.listEnrollments.mockResolvedValue({ items: [], total: 0 });
+    api.listPipelines.mockResolvedValue([pipeline()]);
+    api.listDeals.mockResolvedValue([]);
+    api.dealForecast.mockResolvedValue({ stages: [], open: { count: 0, amount: 0, weighted: 0 }, won: { count: 0, amount: 0 }, lost: { count: 0, amount: 0 } });
 }
 
 export function list(overrides: Record<string, unknown> = {}): any {
@@ -197,6 +200,46 @@ export function automation(overrides: Record<string, unknown> = {}): any {
         goalFilter: null,
         publishedVersionUid: null,
         publishedAt: null,
+        ...stored,
+        ...overrides,
+    };
+}
+
+export function pipeline(overrides: Record<string, unknown> = {}): any {
+    return {
+        uid: "p1",
+        workspaceUid: "w1",
+        name: "Sales",
+        isDefault: true,
+        stages: [
+            { id: "st1", name: "Qualified", probability: 10, kind: "open", rottingDays: 7 },
+            { id: "st2", name: "Proposal", probability: 60, kind: "open" },
+            { id: "won", name: "Won", probability: 100, kind: "won" },
+            { id: "lost", name: "Lost", probability: 0, kind: "lost" },
+        ],
+        ...stored,
+        ...overrides,
+    };
+}
+
+export function deal(overrides: Record<string, unknown> = {}): any {
+    return {
+        uid: "d1",
+        workspaceUid: "w1",
+        name: "Acme renewal",
+        amount: 1200,
+        currency: "USD",
+        pipelineUid: "p1",
+        stageId: "st1",
+        status: "open",
+        ownerUserUid: "u1",
+        contactUids: [],
+        companyUid: null,
+        expectedCloseDate: null,
+        closedAt: null,
+        lostReason: null,
+        stageChangedAt: new Date().toISOString(),
+        stageHistory: [{ stageId: "st1", at: "2026-09-01T00:00:00.000Z" }],
         ...stored,
         ...overrides,
     };

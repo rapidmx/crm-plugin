@@ -59,6 +59,10 @@ export class WorkspaceSenderMongo extends BaseMongoEntity implements WorkspaceSe
     @Description("The member who added the sender.")
     public createdByUserUid: string = "";
 
+    @Column()
+    @Description("Whether its mailbox's mail with contacts is logged.")
+    public logEmail: boolean = false;
+
     constructor(other?: Partial<WorkspaceSenderMongo>) {
         super(other);
 
@@ -69,6 +73,7 @@ export class WorkspaceSenderMongo extends BaseMongoEntity implements WorkspaceSe
             this.fromName = other.fromName !== undefined ? other.fromName : this.fromName;
             this.replyToAddress = "replyToAddress" in other ? other.replyToAddress : this.replyToAddress;
             this.createdByUserUid = other.createdByUserUid !== undefined ? other.createdByUserUid : this.createdByUserUid;
+            this.logEmail = other.logEmail !== undefined ? other.logEmail : this.logEmail;
         }
     }
 }

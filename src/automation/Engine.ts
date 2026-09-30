@@ -53,7 +53,7 @@ export function triggerMatches(trigger: AutomationNode, event: Pick<CrmEvent, "t
     if (config.event !== event.type || event.type === CrmEventType.MANUAL) {
         return false;
     }
-    for (const field of ["listUid", "formUid", "segmentUid"] as const) {
+    for (const field of ["listUid", "formUid", "segmentUid", "pipelineUid", "stageId"] as const) {
         if (config[field] && config[field] !== event.data[field]) {
             return false;
         }

@@ -15,11 +15,13 @@ import { CrmImportMongo } from "./CrmImportMongo.js";
 import { CrmNoteMongo } from "./CrmNoteMongo.js";
 import { CrmSettingMongo } from "./CrmSettingMongo.js";
 import { CrmTaskMongo } from "./CrmTaskMongo.js";
+import { DealMongo } from "./DealMongo.js";
 import { EmailTemplateMongo } from "./EmailTemplateMongo.js";
 import { EngagementEventMongo } from "./EngagementEventMongo.js";
 import { EnrollmentMongo } from "./EnrollmentMongo.js";
 import { MailingListMongo } from "./MailingListMongo.js";
 import { OutboundSendMongo } from "./OutboundSendMongo.js";
+import { PipelineMongo } from "./PipelineMongo.js";
 import { PropertyDefinitionMongo } from "./PropertyDefinitionMongo.js";
 import { PropertyValueMongo } from "./PropertyValueMongo.js";
 import { SavedBlockMongo } from "./SavedBlockMongo.js";
@@ -61,5 +63,7 @@ export const MONGO_MODELS: CrmModelClasses = {
     automationVersion: AutomationVersionMongo,
     enrollment: EnrollmentMongo,
     crmEvent: CrmEventMongo,
+    pipeline: PipelineMongo,
+    deal: DealMongo,
     mailbox: MailboxMongo,
 };
