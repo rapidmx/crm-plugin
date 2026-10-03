@@ -69,23 +69,31 @@ export class CrmRepoUtils<T extends BaseEntity | SimpleEntity> extends RepoUtils
     }
 }
 
-/** Creates (once each, on first use) the `RepoUtils` (`CrmRepoUtils`) of every model in a `CrmModelClasses`. */
+/** Holds the `RepoUtils` (`CrmRepoUtils`) of every model in a `CrmModelClasses`, built once by `CrmRepos.create()`. */
 export class CrmRepos {
-    private readonly repos: Map<CrmModelName, RepoUtils<any>> = new Map();
-
-    public constructor(
-        private readonly objectFactory: ObjectFactory,
+    private constructor(
         public readonly classes: CrmModelClasses,
+        private readonly repos: Map<CrmModelName, RepoUtils<any>>,
     ) {}
+
+    /** Builds, through `objectFactory`, the repository of every model of `classes` that is set. */
+    public static async create(objectFactory: ObjectFactory, classes: CrmModelClasses): Promise<CrmRepos> {
+        const repos: Map<CrmModelName, RepoUtils<any>> = new Map();
+        for (const name of Object.keys(classes) as CrmModelName[]) {
+            const modelClass: any = classes[name];
+            if (modelClass) {
+                repos.set(name, await objectFactory.newInstance(CrmRepoUtils, { name: modelClass.name, args: [modelClass] }));
+            }
+        }
+        return new CrmRepos(classes, repos);
+    }
 
     /** The `RepoUtils` of `name`'s model. */
     public async get<T = any>(name: CrmModelName): Promise<RepoUtils<T & any>> {
-        let repo: RepoUtils<any> | undefined = this.repos.get(name);
+        const repo: RepoUtils<any> | undefined = this.repos.get(name);
         if (!repo) {
-            const modelClass: any = this.classes[name];
-            repo = await this.objectFactory.newInstance(CrmRepoUtils, { name: modelClass.name, args: [modelClass] });
-            this.repos.set(name, repo!);
+            throw new Error(`The model '${name}' is not set.`);
         }
-        return repo!;
+        return repo;
     }
 }

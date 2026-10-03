@@ -38,9 +38,12 @@ describe("CRM routes (SQL)", () => {
     };
     const users = { owner: user(), editor: user(), viewer: user(), stranger: user(), admin: user(["admin"]) };
 
+    let repos: CrmRepos;
+
     beforeAll(async () => {
         registerTestDoubles(objectFactory);
         await server.start();
+        repos = await CrmRepos.create(objectFactory, SQL_MODELS);
         const connections: ConnectionManager | undefined = objectFactory.getInstance(ConnectionManager);
         acl = connections?.connections.get("acl");
         sql = connections?.connections.get("sql");
@@ -69,7 +72,6 @@ describe("CRM routes (SQL)", () => {
         vi.restoreAllMocks();
     });
 
-    const repos = new CrmRepos(objectFactory, SQL_MODELS);
     const ctx: CrmTestContext = {
         app: () => server.getApplication(),
         prefix: "/sql/crm",

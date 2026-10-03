@@ -10,7 +10,7 @@ import type { BaseContactRoute } from "./BaseContactRoute.js";
 import { hashApiKey } from "./BaseApiKeyRoute.js";
 import { CrmRouteBase } from "./CrmRouteBase.js";
 import { badRequest, isObject, readEmail, readText, requireObject } from "../util/Validation.js";
-const { Inject } = ObjectDecorators;
+const { Init, Inject } = ObjectDecorators;
 const { Get, Param, Post, Request } = RouteDecorators;
 
 /** How many calls one key may make a minute. */
@@ -37,11 +37,17 @@ export abstract class BaseIntegrationRoute extends CrmRouteBase {
     @Inject(RateLimiter)
     protected rateLimiter?: RateLimiter;
 
-    private contactRoute?: BaseContactRoute;
+    protected contactRoute?: BaseContactRoute;
 
-    private async contacts(): Promise<BaseContactRoute> {
-        this.contactRoute ??= await this._objectFactory!.newInstance(this.contactRouteClass, { name: "crm-integrations" });
-        return this.contactRoute;
+    /** Builds the contact route that writes the contacts of the integration API, once. */
+    @Init
+    protected async initializeIntegration(): Promise<void> {
+        if (!this._objectFactory) {
+            throw new Error("objectFactory is not set.");
+        }
+        if (!this.contactRoute && this.contactRouteClass) {
+            this.contactRoute = await this._objectFactory.newInstance(this.contactRouteClass, { name: "crm-integrations" });
+        }
     }
 
     /** The key of the request, if it is one of the workspace's, unrevoked and holding `scope` - else a 401 or 403. */
@@ -72,7 +78,7 @@ export abstract class BaseIntegrationRoute extends CrmRouteBase {
     private async upsertContact(workspaceUid: string, request: Record<string, unknown>): Promise<{ outcome: string; uid: string }> {
         readEmail(request, "email", { required: true });
         const { listUid: _list, name: _name, data: _data, ...fields } = request;
-        return await (await this.contacts()).importRow(workspaceUid, "", fields, true);
+        return await this.contactRoute!.importRow(workspaceUid, "", fields, true);
     }
 
     @Post("/:workspaceUid/contacts")

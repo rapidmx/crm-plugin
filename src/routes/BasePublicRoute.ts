@@ -33,7 +33,7 @@ import { MAX_TOKEN_LENGTH, TokenPayload, verifyToken } from "../util/Tokens.js";
 import { badRequest, isObject, readEmail, readText } from "../util/Validation.js";
 import { notFound } from "../util/WorkspaceAccess.js";
 import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
-const { Config, Inject } = ObjectDecorators;
+const { Config, Init, Inject } = ObjectDecorators;
 const { Get, Param, Post, Request, Response } = RouteDecorators;
 
 /** How long a double opt-in confirmation link works, in days. */
@@ -94,7 +94,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
     @Config("trusted_proxies", [])
     protected trustedProxies: string[] = [];
 
-    private contactRoute?: BaseContactRoute;
+    protected contactRoute?: BaseContactRoute;
 
     @Get("/forms/:formUid")
     public async getForm(@Param("formUid") formUid: string, @Request req: HttpRequest): Promise<PublicForm> {
@@ -140,7 +140,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
             await contactRepo.find({ workspaceUid: ModelUtils.literal(form.workspaceUid), email: ModelUtils.literal(email) }, { ignoreACL: true, limit: 1, skipCache: true })
         )[0];
         const write: Record<string, unknown> = await this.contactWrite(form, submitted, existing, definitions);
-        const { uid: contactUid } = await (await this.contacts()).importRow(form.workspaceUid, "", write, true);
+        const { uid: contactUid } = await this.contactRoute!.importRow(form.workspaceUid, "", write, true);
 
         const lists: MailingList[] = [];
         for (const listUid of form.listUids) {
@@ -301,9 +301,15 @@ export abstract class BasePublicRoute extends CrmRouteBase {
         return resolveClientIp(req, this.trustedProxies);
     }
 
-    private async contacts(): Promise<BaseContactRoute> {
-        this.contactRoute ??= await this._objectFactory!.newInstance(this.contactRouteClass, { name: "crm-public" });
-        return this.contactRoute;
+    /** Builds the contact route that writes the contacts of the public forms, once. */
+    @Init
+    protected async initializePublic(): Promise<void> {
+        if (!this._objectFactory) {
+            throw new Error("objectFactory is not set.");
+        }
+        if (!this.contactRoute && this.contactRouteClass) {
+            this.contactRoute = await this._objectFactory.newInstance(this.contactRouteClass, { name: "crm-public" });
+        }
     }
 
     private async requireForm(formUid: string): Promise<CrmForm> {

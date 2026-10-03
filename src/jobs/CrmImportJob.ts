@@ -19,7 +19,7 @@ import {
 import type { BaseTaggedRecordRoute } from "../routes/BaseTaggedRecordRoute.js";
 import { detectDelimiter, parseCsv } from "../util/Csv.js";
 import { COMPANY_NAME_TARGET, rowToBody } from "../util/ImportMapping.js";
-const { Config, Inject, Logger } = ObjectDecorators;
+const { Config, Init, Inject, Logger } = ObjectDecorators;
 
 /** How many rows are imported between progress saves (and lease renewals). */
 const PROGRESS_EVERY = 100;
@@ -61,15 +61,33 @@ export abstract class CrmImportJob extends BackgroundService {
     @Logger
     protected logger?: any;
 
-    private repos?: CrmRepos;
-    private routes: Map<CrmObjectType, BaseTaggedRecordRoute<any>> = new Map();
+    protected repos?: CrmRepos;
+    protected contactRoute?: BaseTaggedRecordRoute<any>;
+    protected companyRoute?: BaseTaggedRecordRoute<any>;
+
+    /** Builds the repositories of every model and the contact and company routes that write an import's rows, once. */
+    @Init
+    protected async initialize(): Promise<void> {
+        if (!this._objectFactory) {
+            throw new Error("objectFactory is not set.");
+        }
+        if (!this.repos && this.classes) {
+            this.repos = await CrmRepos.create(this._objectFactory, this.classes);
+        }
+        if (!this.contactRoute && this.contactRouteClass) {
+            this.contactRoute = await this._objectFactory.newInstance(this.contactRouteClass, { name: "crm-import" });
+        }
+        if (!this.companyRoute && this.companyRouteClass) {
+            this.companyRoute = await this._objectFactory.newInstance(this.companyRouteClass, { name: "crm-import" });
+        }
+    }
 
     public get schedule(): string | undefined {
         return this.scheduleExpr;
     }
 
     public start(): void {
-        // Nothing to prepare: repositories and routes are created on first use.
+        // Nothing to prepare: repositories and routes are built by the initialize hook.
     }
 
     public stop(): void {
@@ -99,20 +117,12 @@ export abstract class CrmImportJob extends BackgroundService {
     }
 
     private async repo<T>(name: keyof CrmModelClasses): Promise<RepoUtils<T & any>> {
-        this.repos ??= new CrmRepos(this._objectFactory!, this.classes);
-        return await this.repos.get<T>(name);
+        return await this.repos!.get<T>(name);
     }
 
     /** The contact or company route that writes an import's rows. */
-    private async route(objectType: CrmObjectType): Promise<BaseTaggedRecordRoute<any>> {
-        let route: BaseTaggedRecordRoute<any> | undefined = this.routes.get(objectType);
-        if (!route) {
-            route = await this._objectFactory!.newInstance(objectType === CrmObjectType.CONTACT ? this.contactRouteClass : this.companyRouteClass, {
-                name: "crm-import",
-            });
-            this.routes.set(objectType, route!);
-        }
-        return route!;
+    private route(objectType: CrmObjectType): BaseTaggedRecordRoute<any> {
+        return (objectType === CrmObjectType.CONTACT ? this.contactRoute : this.companyRoute)!;
     }
 
     /** Takes `candidate` for this replica, or `undefined` when another took it first. An import claimed too often fails instead. */
@@ -155,7 +165,7 @@ export abstract class CrmImportJob extends BackgroundService {
             { workspaceUid: ModelUtils.literal(current.workspaceUid), objectType: ModelUtils.literal(current.objectType) },
             { ignoreACL: true, limit: 1000, skipCache: true },
         );
-        const route: BaseTaggedRecordRoute<any> = await this.route(current.objectType);
+        const route: BaseTaggedRecordRoute<any> = this.route(current.objectType);
         const companyColumn: number = current.mapping.findIndex((entry) => entry.target === COMPANY_NAME_TARGET);
         const counts = { createdCount: current.createdCount, updatedCount: current.updatedCount, skippedCount: current.skippedCount };
         const errors: ImportRowError[] = [...(current.errors ?? [])];
@@ -210,7 +220,7 @@ export abstract class CrmImportJob extends BackgroundService {
             (await repo.find({ workspaceUid: ModelUtils.literal(current.workspaceUid), name: ModelUtils.literal(name) }, { ignoreACL: true, limit: 1, skipCache: true }))[0];
         let company: CrmCompany | undefined = await find();
         if (!company) {
-            await (await this.route(CrmObjectType.COMPANY)).importRow(current.workspaceUid, current.createdByUserUid, { name }, false);
+            await this.route(CrmObjectType.COMPANY).importRow(current.workspaceUid, current.createdByUserUid, { name }, false);
             company = await find();
         }
         return company!.uid;

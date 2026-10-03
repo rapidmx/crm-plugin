@@ -41,10 +41,13 @@ describe("CRM routes (Mongo)", () => {
     };
     const users = { owner: user(), editor: user(), viewer: user(), stranger: user(), admin: user(["admin"]) };
 
+    let repos: CrmRepos;
+
     beforeAll(async () => {
         await mongod.start();
         registerTestDoubles(objectFactory);
         await server.start();
+        repos = await CrmRepos.create(objectFactory, MONGO_MODELS);
         const connections: ConnectionManager | undefined = objectFactory.getInstance(ConnectionManager);
         aclRepo = (connections?.connections.get("acl") as MongoConnection).getMongoRepository("AccessControlListMongo");
         mongo = connections?.connections.get("mongo") as MongoConnection;
@@ -77,7 +80,6 @@ describe("CRM routes (Mongo)", () => {
         vi.restoreAllMocks();
     });
 
-    const repos = new CrmRepos(objectFactory, MONGO_MODELS);
     const ctx: CrmTestContext = {
         app: () => server.getApplication(),
         prefix: "/mongo/crm",

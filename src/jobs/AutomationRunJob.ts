@@ -9,7 +9,7 @@ import { AutomationGraph } from "../automation/Graph.js";
 import { Automation, AutomationStatus, AutomationVersion, Enrollment, EnrollmentState } from "../models/types.js";
 import type { BaseContactRoute } from "../routes/BaseContactRoute.js";
 import { CrmJobBase } from "./CrmJobBase.js";
-const { Config } = ObjectDecorators;
+const { Config, Init } = ObjectDecorators;
 
 /**
  * Takes due enrollments through their automations (`AutomationEngine.advance()`): those whose delay is over, whose wait timed out,
@@ -32,7 +32,18 @@ export abstract class AutomationRunJob extends CrmJobBase {
     @Config("mail:crm:jobs:automations:paused_retry_seconds", 60)
     protected pausedRetrySeconds: number = 60;
 
-    private contactRoute?: BaseContactRoute;
+    protected contactRoute?: BaseContactRoute;
+
+    /** Builds the contact route the engine's steps change contacts through, once. */
+    @Init
+    protected async initializeAutomationRun(): Promise<void> {
+        if (!this._objectFactory) {
+            throw new Error("objectFactory is not set.");
+        }
+        if (!this.contactRoute && this.contactRouteClass) {
+            this.contactRoute = await this._objectFactory.newInstance(this.contactRouteClass, { name: "crm-automations" });
+        }
+    }
 
     public get schedule(): string | undefined {
         return this.scheduleExpr;
@@ -55,7 +66,7 @@ export abstract class AutomationRunJob extends CrmJobBase {
         const engine = new AutomationEngine({
             repos: this.repos(),
             classes: this.classes,
-            contactRoute: async () => (this.contactRoute ??= await this._objectFactory!.newInstance(this.contactRouteClass, { name: "crm-automations" })),
+            contactRoute: async () => this.contactRoute!,
             notificationUtils: this.notificationUtils,
             logger: this.logger,
         });

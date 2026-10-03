@@ -31,7 +31,7 @@ import { TokenPayload, signToken } from "../util/Tokens.js";
 import { assertWorkspaceAccess, notFound } from "../util/WorkspaceAccess.js";
 import { badRequest } from "../util/Validation.js";
 import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
-const { Config, Inject, Logger } = ObjectDecorators;
+const { Config, Init, Inject, Logger } = ObjectDecorators;
 
 /** The `PropertyValue.key` a contact's subscribed lists are mirrored under, so filters can match list membership. */
 export const LISTS_KEY = "lists";
@@ -82,13 +82,23 @@ export abstract class CrmRouteBase {
     @Logger
     protected logger?: any;
 
-    private crmRepos?: CrmRepos;
+    protected crmRepos?: CrmRepos;
     private cachedTokenSecret?: string;
+
+    /** Builds the repositories of every model, once. */
+    @Init
+    protected async initializeCrm(): Promise<void> {
+        if (!this._objectFactory) {
+            throw new Error("objectFactory is not set.");
+        }
+        if (!this.crmRepos && this.classes) {
+            this.crmRepos = await CrmRepos.create(this._objectFactory, this.classes);
+        }
+    }
 
     /** The repositories of every model. */
     protected repos(): CrmRepos {
-        this.crmRepos ??= new CrmRepos(this._objectFactory!, this.classes);
-        return this.crmRepos;
+        return this.crmRepos!;
     }
 
     /** The repository of `name`'s model. */

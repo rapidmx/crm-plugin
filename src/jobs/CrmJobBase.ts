@@ -7,7 +7,7 @@ import { BackgroundService, NotificationUtils, ObjectFactory, RepoUtils } from "
 import { CrmModelClasses, CrmModelName, CrmRepos } from "../models/CrmModelClasses.js";
 import type { CrmSetting } from "../models/types.js";
 import { readOrCreateTokenSecret } from "../util/Secrets.js";
-const { Config, Inject, Logger } = ObjectDecorators;
+const { Config, Init, Inject, Logger } = ObjectDecorators;
 
 /**
  * What the CRM's background jobs share: the backend's model classes and repositories, the key links are signed with, the public site,
@@ -31,11 +31,22 @@ export abstract class CrmJobBase extends BackgroundService {
     @Logger
     protected logger?: any;
 
-    private crmRepos?: CrmRepos;
+    protected crmRepos?: CrmRepos;
     private cachedTokenSecret?: string;
 
+    /** Builds the repositories of every model, once. */
+    @Init
+    protected async initializeCrm(): Promise<void> {
+        if (!this._objectFactory) {
+            throw new Error("objectFactory is not set.");
+        }
+        if (!this.crmRepos && this.classes) {
+            this.crmRepos = await CrmRepos.create(this._objectFactory, this.classes);
+        }
+    }
+
     public start(): void {
-        // Nothing to prepare: repositories are created on first use.
+        // Nothing to prepare: repositories are built by the initialize hook.
     }
 
     public stop(): void {
@@ -43,8 +54,7 @@ export abstract class CrmJobBase extends BackgroundService {
     }
 
     protected repos(): CrmRepos {
-        this.crmRepos ??= new CrmRepos(this._objectFactory!, this.classes);
-        return this.crmRepos;
+        return this.crmRepos!;
     }
 
     protected async repo<T = any>(name: CrmModelName): Promise<RepoUtils<T & any>> {
