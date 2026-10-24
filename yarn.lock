@@ -966,8 +966,8 @@ __metadata:
   dependencies:
     "@dnd-kit/core": "npm:^6.3.1"
     "@dnd-kit/sortable": "npm:^10.0.0"
-    "@rapidmx/restapi": "npm:^0.26.0"
-    "@rapidmx/web-client": "npm:^0.26.0"
+    "@rapidmx/restapi": "npm:^0.34.0"
+    "@rapidmx/web-client": "npm:^0.36.0"
     "@rapidrest/core": "npm:^6.0.0"
     "@rapidrest/react": "npm:^2.1.0"
     "@rapidrest/service-core": "npm:^2.4.0"
