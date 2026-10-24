@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-24
+
+### Changed
+- Publish a prerelease version to npm under the next tag, which npm requires, and a release under latest
+- Build the repositories and the collaborating routes of the CRM jobs and routes in @Init hooks
+- Build against @rapidmx/restapi ^0.34.0 and @rapidmx/web-client ^0.36.0
+
 ## [0.2.0] - 2026-09-30
 
 ### Added
@@ -20,5 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Choose Send as senders from the mailboxes the caller can send from, with the mailbox's display name prefilled and editable
 - Pick the workspace's time zone with the system's time zone picker
 
-[Unreleased]: https://github.com/rapidmx/crm-plugin/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rapidmx/crm-plugin/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rapidmx/crm-plugin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/rapidmx/crm-plugin/compare/v0.1.0...v0.2.0
