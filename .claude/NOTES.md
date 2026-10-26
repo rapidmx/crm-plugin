@@ -367,3 +367,7 @@ Keep entries terse — this is a reference, not a transcript.
 
 - JP asked for them after Phase 8. New `src/automation/Dates.ts`, `DateTriggerJob`, `Automation.dateCheckedOn`, the date trigger's
   settings in the step inspector, and a "Birthday greeting" recipe (recipes can now set `reentry`). 582 tests.
+
+### 2026-10-26: Publish gate
+
+- **Publish only from the tag's own green Build.** A release pushes `main` and its tag at the same commit, and each push runs Build. The old Publish ran after *any* green Build of a tagged commit, so a failed Build on the other ref (activesync v1.2.0's tag run, web-client v0.37.0's `main` run) didn't stop the release, and the second Publish run always failed as a duplicate. `.github/workflows/publish.yml`'s `check` job now runs only for a tag push's Build, verifies the tag points at the commit on `main`, and waits until every Build of that commit has finished, refusing if any did not succeed (a green rerun triggers Publish again). Same change as activesync 9c0f71d, which was verified with a real release (activesync 1.2.1).
