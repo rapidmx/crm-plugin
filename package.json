@@ -45,8 +45,8 @@
     },
     "devDependencies": {
         "@dnd-kit/core": "^6.3.1",
-        "@rapidmx/restapi": "^0.36.0",
-        "@rapidmx/web-client": "^0.38.1",
+        "@rapidmx/restapi": "^0.37.0",
+        "@rapidmx/web-client": "^0.39.0",
         "@rapidrest/core": "^6.1.0",
         "@rapidrest/react": "^2.3.0",
         "@rapidrest/service-core": "^2.5.1",
@@ -99,8 +99,8 @@
         "winston": "^3.19.0"
     },
     "resolutions": {
-        "@rapidmx/restapi": "^0.36.0",
-        "@rapidmx/web-client": "^0.38.1"
+        "@rapidmx/restapi": "^0.37.0",
+        "@rapidmx/web-client": "^0.39.0"
     },
     "packageManager": "yarn@4.5.3",
     "engines": {
