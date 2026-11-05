@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-05
+
+### Added
+- Added the rule that the more specific agent model assignment wins where categories overlap
+- Added the RapidREST Claude Code plugin to the project settings
+
+### Changed
+- Publish only from a release tag's own Build, and only once every Build of that commit has finished green
+- Record the standing agent model assignments in the project notes
+- Move the agent model assignments to the top of the project notes, keeping session history at the bottom
+- Update the agent model assignments to JP's revised criteria: Sonnet for general code and review, Opus for architecture, planning, investigation, security and performance, Haiku for simple operations
+- Upgrade @rapidrest/core to 6.1.0, @rapidrest/service-core to 2.5.1 and @rapidrest/react to 2.3.0
+- Upgrade @rapidmx/restapi to ^0.36.0 and @rapidmx/web-client to ^0.38.1, with the resolutions to match
+- Upgrade every other dependency to its latest release, keeping typescript on 6.x
+- Install corepack globally before enabling it in CI, since the node:lts images no longer bundle it
+- Upgrade @rapidmx/restapi to ^0.37.0 and @rapidmx/web-client to ^0.39.0, with the resolutions to match
+
 ## [0.3.0] - 2026-10-24
 
 ### Changed
@@ -27,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Choose Send as senders from the mailboxes the caller can send from, with the mailbox's display name prefilled and editable
 - Pick the workspace's time zone with the system's time zone picker
 
-[Unreleased]: https://github.com/rapidmx/crm-plugin/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/rapidmx/crm-plugin/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/rapidmx/crm-plugin/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/rapidmx/crm-plugin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/rapidmx/crm-plugin/compare/v0.1.0...v0.2.0
