@@ -222,6 +222,37 @@ export function listSuite(ctx: CrmTestContext): void {
                 expect((await anon("post", `/forms/${form.uid}`, { values: { email: "a@x.example" } })).status).toBe(404);
             });
 
+            it("accepts a submission from a signed-in visitor whose form is embedded on another origin (rapidmx/server#13)", async () => {
+                const list = await createList({ name: "Newsletter" });
+                const created = await call(ctx, "post", formPath(), ctx.users.owner, { name: "Footer signup", listUids: [list.uid], senderUid, doubleOptIn: false });
+                expect(created.status).toBe(200);
+                const form = created.body;
+
+                // The double-submit pair a real browser holds: the csrf cookie set by any earlier request to this
+                // site, echoed back as the header. Read it off the form page's own response rather than inventing it.
+                const page: any = await anon("get", `/forms/${form.uid}`);
+                const setCookie: string[] = Array.isArray(page.headers["set-cookie"]) ? page.headers["set-cookie"] : [page.headers["set-cookie"]];
+                const csrf: string | undefined = setCookie
+                    .flatMap((value) => String(value).split(";"))
+                    .map((pair) => /^csrf=(.*)$/.exec(pair.trim()))
+                    .filter(Boolean)
+                    .map((match) => match![1])[0];
+                expect(csrf).toBeTruthy();
+
+                // Exactly the reported request: a visitor signed into the webmail on this site (so their browser
+                // attaches the `jwt` cookie, which makes the request cookie-authenticated and so CSRF-checked),
+                // POSTing the form from a page embedded on another origin — matching csrf cookie and header, and
+                // an `Origin` that is not this server's own. Must answer 200, not 403 api-105.
+                const submitted = await request(ctx.app())
+                    .post(`${ctx.prefix}/public/forms/${form.uid}`)
+                    .set("Cookie", `jwt=${ctx.users.owner.token}; csrf=${csrf}`)
+                    .set("x-csrf-token", csrf)
+                    .set("Origin", "https://embedding.example.com")
+                    .send({ values: { email: "cross-origin@x.example" } });
+                expect(submitted.status).toBe(200);
+                expect(submitted.body).toMatchObject({ result: "subscribed" });
+            });
+
             it("subscribes a form's submitter at once without double opt-in, creating the contact, its company and its properties", async () => {
                 const list = await createList({ name: "Updates" });
                 await call(ctx, "post", `/properties/${workspaceUid}`, ctx.users.owner, { objectType: "contact", key: "seats", label: "Seats", type: "number" });

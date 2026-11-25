@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed the documented signup-form embed failing with 403 `api-105` ("This request is missing a valid CSRF token") for a
+  visitor signed into the webmail: the CRM's anonymous endpoints (`/api/mail/crm/public`) now run no auth strategy
+  (`@Auth([], false)`), so service-core's CSRF origin allow-list - which holds the deployment's own hosts, never the site
+  the form is embedded on - can no longer reject a cross-origin submission whose double-submit pair matches
+  (`rapidmx/server#13`)
+
 ## [0.4.0] - 2026-11-05
 
 ### Added
