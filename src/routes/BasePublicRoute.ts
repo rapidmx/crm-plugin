@@ -34,7 +34,7 @@ import { badRequest, isObject, readEmail, readText } from "../util/Validation.js
 import { notFound } from "../util/WorkspaceAccess.js";
 import { CrmEventType, recordCrmEvent } from "../automation/Events.js";
 const { Config, Init, Inject } = ObjectDecorators;
-const { Get, Param, Post, Request, Response } = RouteDecorators;
+const { Auth, Get, Param, Post, Request, Response } = RouteDecorators;
 
 /** How long a double opt-in confirmation link works, in days. */
 export const CONFIRM_TOKEN_DAYS = 7;
@@ -80,6 +80,16 @@ export interface PreferencesView {
  * unsubscribing from all email.
  * - `POST /unsubscribe/:token` - one-click unsubscribe (RFC 8058: what a mail client posts for `List-Unsubscribe-Post`), from the
  * token's list, or from all email when it names none.
+ *
+ * Every handler is `@Auth([], false)`: no auth strategy runs at all, so `req.auth` is never set and these endpoints are never
+ * gated by `RouteUtils.checkCsrf()`. That is not a weakening - nothing here reads a signed-in user (the tokens that gate
+ * confirm/preferences/unsubscribe are signed and can't be forged), the CSRF defense protects cookie-authenticated state these
+ * endpoints don't have, and both the embed flow (an iframe on a third-party site, whose `Origin`/`Referer` is that site, not
+ * this server's own hostnames) and RFC 8058 one-click unsubscribe (posted by a mail client with no cookies or CSRF token at
+ * all) must keep working. Without it, a visitor signed into the webmail on the same site carries a `jwt` cookie, the default
+ * `["jwt"]` strategy marks them cookie-authenticated, and a cross-origin POST is rejected with 403 `api-105` even when its
+ * double-submit pair matches - see rapidmx/server#13. The same pattern the server's own public routes use
+ * (`BaseStaticAssetRoute`).
  */
 export abstract class BasePublicRoute extends CrmRouteBase {
     /** The backend's concrete contact route, which writes contacts from forms exactly as the API does. */
@@ -97,6 +107,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
     protected contactRoute?: BaseContactRoute;
 
     @Get("/forms/:formUid")
+    @Auth([], false)
     public async getForm(@Param("formUid") formUid: string, @Request req: HttpRequest): Promise<PublicForm> {
         await this.limit("form-view", req);
         const form: CrmForm = await this.requireForm(formUid);
@@ -120,6 +131,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
     }
 
     @Post("/forms/:formUid")
+    @Auth([], false)
     public async submitForm(@Param("formUid") formUid: string, body: unknown, @Request req: HttpRequest): Promise<FormResult> {
         await this.limit("form-submit", req);
         const form: CrmForm = await this.requireForm(formUid);
@@ -183,6 +195,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
     }
 
     @Post("/confirm/:token")
+    @Auth([], false)
     public async confirm(@Param("token") token: string, @Request req: HttpRequest): Promise<{ workspaceName: string; lists: string[] }> {
         await this.limit("confirm", req);
         const { payload, workspace, contact } = await this.resolveToken(token, "confirm");
@@ -202,6 +215,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
     }
 
     @Get("/preferences/:token")
+    @Auth([], false)
     public async getPreferences(@Param("token") token: string, @Request req: HttpRequest): Promise<PreferencesView> {
         await this.limit("preferences", req);
         const { workspace, contact } = await this.resolveToken(token, "prefs");
@@ -214,6 +228,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
      * `unsubscribeAll: false` (or subscribing to a list) takes back an earlier "unsubscribe from all".
      */
     @Post("/preferences/:token")
+    @Auth([], false)
     public async setPreferences(@Param("token") token: string, body: unknown, @Request req: HttpRequest): Promise<PreferencesView> {
         await this.limit("preferences", req);
         const { workspace, contact } = await this.resolveToken(token, "prefs");
@@ -247,6 +262,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
      * `POST` it; a person following it gets the page with its button). Unsubscribes nothing itself.
      */
     @Get("/unsubscribe/:token")
+    @Auth([], false)
     public async unsubscribePage(@Param("token") token: string, @Response res: HttpResponse): Promise<void> {
         res.setHeader("location", this.publicLink(`/subscriptions/unsubscribe/${encodeURIComponent(String(token).slice(0, MAX_TOKEN_LENGTH))}`));
         res.status(302).end();
@@ -258,6 +274,7 @@ export abstract class BasePublicRoute extends CrmRouteBase {
      * landing page can offer the preference center.
      */
     @Post("/unsubscribe/:token")
+    @Auth([], false)
     public async unsubscribe(@Param("token") token: string, @Request req: HttpRequest): Promise<{ workspaceName: string; list?: string; preferencesToken: string }> {
         await this.limit("unsubscribe", req);
         const { payload, workspace, contact } = await this.resolveToken(token, "unsub");
